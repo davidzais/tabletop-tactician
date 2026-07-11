@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets / local config
+.env
+.vscode/
+
+# Personal planning docs — kept out of the repo
+DESIGN.md
+DESIGN.pdf
+NOTES.md
