@@ -1,33 +1,25 @@
-import wh40kdc
 from pathlib import Path
 import pytest
+from tabletop_tactician.reference_data.roster import Army, load_roster
 
-marines = Path(__file__).parent / "fixtures" / "space_marines.json"
-orks = Path(__file__).parent / "fixtures" / "orks.json"
+marines_path = Path(__file__).parent / "fixtures" / "space_marines.json"
+orks_path = Path(__file__).parent / "fixtures" / "orks.json"
 
-def load_roster(path: Path)-> list[dict]:
-    # Roster fixtures are gitignored (they embed GW's rules text). If they're not
-    # present, skip rather than error — see tests/fixtures/README.md.
+
+
+def _read_roster_text(path) -> str:
     if not path.exists():
         pytest.skip(f"roster fixture '{path.name}' not present — see tests/fixtures/README.md")
-
+    
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
 
-        res = wh40kdc.try_import_roster( text)
-
-        if not res["ok"]:
-            raise ValueError(f"Failed to import roster {path}: {res.get('roster', {}).get('diagnostics')}")
-
-
-        roster: list[dict] = res["roster"]["units"]
-    
-    return roster
+    return text
 
 @pytest.fixture
-def space_marines_army() -> list[dict]:
-    return load_roster( marines)
+def space_marines_army() -> Army:    
+    return load_roster( _read_roster_text(marines_path))
 
 @pytest.fixture
-def orks_army() -> list[dict]:
-    return load_roster( orks)
+def orks_army() -> Army:
+    return load_roster( _read_roster_text(orks_path))

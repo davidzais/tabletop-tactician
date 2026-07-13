@@ -1,5 +1,6 @@
 from functools import cache
 from wh40kdc import Dataset, crunch
+from tabletop_tactician.reference_data.roster import FieldedUnit
 
 
 def unit_raw(unit_id: str) -> dict:
@@ -7,9 +8,16 @@ def unit_raw(unit_id: str) -> dict:
     return dataset.units.get_any(unit_id).raw
    
 
-def weapon_raw(weapon_id: str) -> dict:
+def weapon_raw(weapon_id: str, faction_id: str) -> dict:
     dataset = get_dataset()
-    return dataset.weapons.get_any(weapon_id).raw
+
+    #try to get the weapon from the actual faction, if its not available, fallback to getting the weapon
+    #from first available faction. They should have the same profile
+    weapon = dataset.weapons.get_in_faction(id=weapon_id, faction_id=faction_id)
+    if weapon is None:
+        weapon =  dataset.weapons.get_any(id=weapon_id)
+
+    return weapon.raw
 
 def get_stage(crunch_result: dict, stage_name: str) -> float:
     """Pull one stage's expected value out of a crunch result by name."""
@@ -29,15 +37,15 @@ def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, models_firing: i
     return next(s for s in result["stages"] if s["name"] == "damage")["expected"]
 
 # --- a roster unit's total damage in one phase (the roll-up, loadout-driven) ---
-def unit_damage(attacker_unit: dict, target_unit: dict, phase: str) -> float:
+def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, defender_faction_id: str,  phase: str) -> float:
     """attacker_entry / target_entry are roster units: {ref, model_count, wargear}."""
-    target = unit_raw(target_unit["ref"]["id"])
+    target = unit_raw(target_unit.id)
     total = 0.0
-    for wg in attacker_unit["wargear"]:
-        wr = weapon_raw(wg["ref"]["id"])
+    for wg in attacker_unit.wargear:
+        wr = weapon_raw(wg.id, attacker_faction_id)
         if wr["type"] != phase:  # phase filter, off the weapon's own type
             continue
-        total += weapon_damage(wr, target, wg["count"])  # count = models firing THIS weapon
+        total += weapon_damage(wr, target, wg.count)  # count = models firing THIS weapon
     return total
 
 @cache
