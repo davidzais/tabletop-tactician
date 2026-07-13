@@ -17,3 +17,13 @@ wheels/
 DESIGN.md
 DESIGN.pdf
 NOTES.md
+VOCABULARY.md
+WH40KDC.md
+
+# scratch / learning sample
+sample.py
+sample_roster.py
+
+# Test-fixture rosters — exported army lists embed GW's rules text; keep out of the repo.
+# Drop your own ListForge exports here to run the combat tests (see tests/fixtures/README.md).
+tests/fixtures/*.json

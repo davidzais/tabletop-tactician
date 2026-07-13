@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "An agentic Warhammer 40,000 matchup adviser: deterministic combat math plus an LLM that reasons over it."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "wh40kdc>=1.0.26",
+]
 
 [build-system]
 requires = ["hatchling"]
