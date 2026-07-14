@@ -27,3 +27,6 @@ sample_roster.py
 # Test-fixture rosters — exported army lists embed GW's rules text; keep out of the repo.
 # Drop your own ListForge exports here to run the combat tests (see tests/fixtures/README.md).
 tests/fixtures/*.json
+
+# Personal exploration rosters (for scripts/show_matrix.py) — also embed GW rules text.
+rosters/

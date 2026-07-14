@@ -2,8 +2,8 @@ from pathlib import Path
 import pytest
 from tabletop_tactician.reference_data.roster import Army, load_roster
 
-marines_path = Path(__file__).parent / "fixtures" / "space_marines.json"
-orks_path = Path(__file__).parent / "fixtures" / "orks.json"
+army_a_path = Path(__file__).parent / "fixtures" / "army_a.json"
+army_b_path = Path(__file__).parent / "fixtures" / "army_b.json"
 
 
 
@@ -17,9 +17,9 @@ def _read_roster_text(path) -> str:
     return text
 
 @pytest.fixture
-def space_marines_army() -> Army:    
-    return load_roster( _read_roster_text(marines_path))
+def army_a() -> Army:    
+    return load_roster( _read_roster_text(army_a_path))
 
 @pytest.fixture
-def orks_army() -> Army:
-    return load_roster( _read_roster_text(orks_path))
+def army_b() -> Army:
+    return load_roster( _read_roster_text(army_b_path))

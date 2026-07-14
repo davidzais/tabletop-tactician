@@ -1,48 +1,51 @@
 import pytest
 from tabletop_tactician.models.profiles import WeaponType
-from tabletop_tactician.reference_data.dataset import  weapon_damage, weapon_raw, unit_damage, unit_raw
+from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw
+from tabletop_tactician.combat_mechanics.damage import weapon_damage, unit_damage
 from tabletop_tactician.reference_data.roster import Army
 from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups
+from tabletop_tactician.reference_data.roster import FieldedUnit, Wargear
 
-
-
-
-
-def test_unit_damage(space_marines_army: Army, orks_army: Army):
-    _check(space_marines_army, orks_army )
-    _check( orks_army, space_marines_army)
-        
+def test_pistol_rule_suppresses_pistols():
+  
+    # 1 rifle + 5 pistols → the rule should fire the rifle + (5 − 1) = 4 pistols
+    # even though one model of the 5 has a pistol and a rifle, the rifle does more damage so we are going to assume
+    # the player will be fireing the rifle, not the pistol
+    attacker = FieldedUnit(
+        id="intercessor-squad",
+        model_count=5,
+        wargear=[Wargear(id="bolt-rifle", count=1), Wargear(id="bolt-pistol", count=5), Wargear(id="close-combat-weapon", count=5)],
+    )
    
-def _check(attacking: Army, defending: Army ):
-    #NOTE: the reason we do this here is because weapon_damage needs the wh40kdc representation of the army in the 
-    # crunch call, and what we have is an actual roster in defending_unit. two differnt things, so we have to get the id of the unit in the roster
-    # so the library can look it up to get the representation it needs to call crunch
-    defending_army_raw = unit_raw(defending.units[0].id)
-    attacking_unit = attacking.units[0]
-    defending_unit= defending.units[0]
-   
-    expected: float = 0.0
-    for wg in attacking_unit.wargear:
-        w = weapon_raw(wg.id,attacking.faction_id )
-        if w["type"] != WeaponType.RANGED:
-            continue
-        expected += weapon_damage(w, defending_army_raw, models_firing=wg.count)   # real per-weapon count
-        
-    assert unit_damage(attacking_unit, defending_unit, attacking.faction_id, defending.faction_id, phase=WeaponType.RANGED) == pytest.approx(expected)
+    attacker_faction = "adeptus-astartes"
 
-    expected_melee =  0.0 
-    for wg in attacking_unit.wargear:
-        w = weapon_raw(wg.id, attacking.faction_id)
-        if w["type"] != WeaponType.MELEE:
-            continue
-        expected_melee += weapon_damage(w, defending_army_raw, models_firing=wg.count)
+    target = FieldedUnit(id="boyz", model_count=10, wargear=[])   # only .id is used as the crunch target    
+    target_unit = unit_raw(target.id)
+
+
+    rifle = weapon_raw(weapon_id="bolt-rifle", faction_id=attacker_faction)
+    pistol = weapon_raw(weapon_id="bolt-pistol", faction_id=attacker_faction)
+    expected = weapon_damage(weapon_raw_dict=rifle, target_raw_dict=target_unit, models_firing=1)
+    expected +=  weapon_damage(weapon_raw_dict=pistol, target_raw_dict=target_unit, models_firing=4)
+
+    assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, phase=WeaponType.RANGED) == pytest.approx(expected)
+
+    melee_weapon = weapon_raw(weapon_id="close-combat-weapon", faction_id=attacker_faction)
+    expected_melee = weapon_damage(weapon_raw_dict=melee_weapon, target_raw_dict=target_unit, models_firing=5)   
     
-    assert unit_damage(attacking_unit, defending_unit, attacking.faction_id, defending.faction_id, WeaponType.MELEE) == pytest.approx(expected_melee)
+    assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, phase=WeaponType.MELEE) == pytest.approx(expected_melee)
+
+    
+def test_matchup(army_a: Army, army_b: Army):
+    attacking_army = army_a    
+    defending_army = army_b
+    matchups = build_combat_matchups(attacking_army=attacking_army, defending_army=defending_army)
+    
+    assert len(matchups) == len(attacking_army.units) * len(defending_army.units) * 2
 
 
-def test_matchup(space_marines_army: Army, orks_army: Army):
-    attacking_army = space_marines_army
-    defending_army = orks_army
+    attacking_army = army_b
+    defending_army = army_a
     matchups = build_combat_matchups(attacking_army=attacking_army, defending_army=defending_army)
     
     assert len(matchups) == len(attacking_army.units) * len(defending_army.units) * 2
