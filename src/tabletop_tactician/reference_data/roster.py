@@ -47,7 +47,11 @@ def load_roster(text: str) -> Army:
         FieldedUnit(
             id=u["ref"]["id"],
             model_count=u["model_count"],
-            wargear=[Wargear(id=w["ref"]["id"], count=w["count"]) for w in u["wargear"]],
+            wargear=[
+                Wargear(id=w["ref"]["id"], count=w["count"])
+                for w in u["wargear"]
+                if w["ref"]["id"] is not None  # skip weapons wh40kdc couldn't resolve to an id
+            ],
         )
         for u in raw["units"]
     ]
