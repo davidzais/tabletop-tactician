@@ -7,7 +7,21 @@ here (that's combat_mechanics/damage.py).
 from functools import cache
 
 from wh40kdc import Dataset
+from tabletop_tactician.reference_data.roster import Army
 
+
+def get_converted_phase( phase: str) -> str:
+    """  we define the phases of combat as ranged and melee. 
+    Some function of the api require these to be "shooting" or "fight"
+    This is just a simple utility function to do that conversion
+
+    Args:
+        phase (str): the source phase (ranged or melee)
+
+    Returns:
+        str: the converted phase (shooting or fight)
+    """
+    return  "shooting" if phase == "ranged" else "fight"
 
 def unit_raw(unit_id: str) -> dict:
     dataset = get_dataset()
@@ -25,8 +39,49 @@ def weapon_raw(weapon_id: str, faction_id: str) -> dict:
 
     return weapon.raw
 
+def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str,str]]:
+    """List, per unit, the rules the damage engine could NOT account for.
+
+    This is the "honest about the gaps" feature. crunch only models damage it can
+    compute from static stats, so abilities that depend on live game state (e.g.
+    "while attached", "while below half strength") or that aren't damage math at all
+    (movement, ability grants) get left out. We surface those so the app can tell the
+    user "heads up - I didn't factor in X".
+
+    Returns { unit_id: { ability_name: plain-English description } }; units with
+    nothing unmodeled are omitted entirely.
+    """
+    dataset = get_dataset()
+    unit_ability_holder: dict[str, dict[str,str]] = {}
+    converted_phase = get_converted_phase(phase=phase)
+    for unit in army.units:
+        # the library keys ability lookups by unit id + faction; phase is "shooting"/"fight"
+        unit_input = {"unitId": unit.id, "factionId": army.faction_id}
+        phase_context = {"phase": converted_phase}
+                
+        # build this unit's {ability_name: description} map of gaps.
+        # eligible_abilities -> every ability that could apply this phase (each entry
+        #   is {"ability": AbilityView, "source": ...}).
+        # describe_buffs(..., "target") -> {"applied", "unsupported", ...}; a non-empty
+        #   "unsupported" means the engine couldn't translate part of it = a real gap.
+        # ability.describe() -> the plain-English text we show the user.
+        ability_holder: dict[str,str] = {}
+        for entry in dataset.eligible_abilities(unit_input, converted_phase):           
+            ability = entry["ability"]            
+            diagnostics = ability.describe_buffs(entry["source"], phase_context, "target")  
+            if diagnostics["unsupported"]:         
+                ability_holder[ability.name] = ability.describe()  
+       
+        # skip units that had no gaps at all - they don't belong in the report
+        if len(ability_holder) == 0:
+            continue
+        unit_ability_holder[unit.id] = ability_holder
+
+    return unit_ability_holder
 
 @cache
 def get_dataset() -> Dataset:
     ds = Dataset.embedded()
     return ds
+
+

@@ -30,3 +30,7 @@ tests/fixtures/*.json
 
 # Personal exploration rosters (for scripts/show_matrix.py) — also embed GW rules text.
 rosters/
+
+# Local inspection / "run it and look" utilities — kept out of the repo for now.
+# Easy to un-ignore later; hard to un-commit. Revisit if they become portfolio-worthy.
+tools/

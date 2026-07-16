@@ -2,24 +2,26 @@ from tabletop_tactician.reference_data.roster import Army, load_roster
 from tabletop_tactician.models.profiles import CombatMatchup
 from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups
 from pathlib import Path
-from dataclasses import asdict
-import json
+
 
 def load(path: Path) -> Army:
     return load_roster(text=path.read_text(encoding="utf-8"))
 
 def get_threat_matrix( attacker: Army, defender: Army) -> list[dict]:
     
-    matchups: list[CombatMatchup] = build_combat_matchups(attacking_army=attacker, defending_army=defender)        
-    return [
-    {
-        "attacker": m.attacker,
-        "defender": m.defender,
-        "combat_phase": m.combat_phase,
-        "damage": round(m.damage, 2),
-    }
-    for m in matchups
-]
+    matchups: list[CombatMatchup] = build_combat_matchups(attacking_army=attacker, defending_army=defender)       
+
+    header = "attacker,defender,phase,damage\n"
+    return header + "\n".join(f"{m.attacker},{m.defender},{m.combat_phase},{round(m.damage, 2)}" for m in matchups) 
+#     return [
+#     {
+#         "attacker": m.attacker,
+#         "defender": m.defender,
+#         "combat_phase": m.combat_phase,
+#         "damage": round(m.damage, 2),
+#     }
+#     for m in matchups
+# ]
 
 
 GET_THREAT_MATRIX_TOOL = {

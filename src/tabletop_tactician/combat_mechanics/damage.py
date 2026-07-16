@@ -7,25 +7,35 @@ Built on wh40kdc.crunch for the per-weapon math, plus our loadout-level rules
 from wh40kdc import crunch
 
 from tabletop_tactician.reference_data.roster import FieldedUnit
-from tabletop_tactician.reference_data.reference import unit_raw, weapon_raw
+from tabletop_tactician.reference_data.reference import unit_raw, weapon_raw, get_dataset, get_converted_phase
+
 
 
 # --- one weapon's damage stage ---
-def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, models_firing: int) -> float:
+def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction_id: str, phase: str, models_firing: int) -> float:
+
+    # this conversion is neccessary for the defensive_buffs_for(), we use ranged/melee
+    # but internally api uses shooting/fight
+    converted_phase = get_converted_phase(phase=phase)
+    unit_input = {"unitId": target_raw_dict["id"], "factionId": defender_faction_id}
+    phase_context = {"phase": converted_phase}
+
+    dataset = get_dataset()
     result = crunch(
+
         {
             "attacker": {"weapon": weapon_raw_dict, "profileIndex": 0},
             "target": {"unit": target_raw_dict, "profileIndex": 0},
             "modelsFiring": models_firing,
-            "buffs": [],
+            "buffs": dataset.defensive_buffs_for(input=unit_input, context=phase_context),
             "context": {},
         }
     )
-    return next(s for s in result["stages"] if s["name"] == "damage")["expected"]
+    return next(s for s in result["stages"] if s["name"] == "after-fnp")["expected"]
 
 
 # --- a roster unit's total damage in one phase (the roll-up, loadout-driven) ---
-def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str,  phase: str) -> float:
+def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, defender_faction_id: str, phase: str) -> float:
     """attacker_unit / target_unit are type FieldedUnit: {id, model_count, wargear}."""
     target = unit_raw(target_unit.id)
     total = 0.0
@@ -34,7 +44,7 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
             wr = weapon_raw(weapon_id=wg.id, faction_id=attacker_faction_id)
             if wr["type"] != phase:  # phase filter, off the weapon's own type
                 continue
-            total += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, models_firing=wg.count)  # count = models firing THIS weapon
+            total += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count)  # count = models firing THIS weapon
         return total
     else:
         pistol_count = 0
@@ -59,11 +69,11 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
                 pistol_holder.append(wr)
             else:
                 non_pistol_count += wg.count
-                total_non_pistol_damage_count += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, models_firing=wg.count)
+                total_non_pistol_damage_count += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target,defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count)
 
         pistols_that_fire = max(0, pistol_count - non_pistol_count)
         if pistols_that_fire != 0:
-            total_pistol_damage = weapon_damage(weapon_raw_dict=pistol_holder[0], target_raw_dict=target, models_firing=pistols_that_fire)
+            total_pistol_damage = weapon_damage(weapon_raw_dict=pistol_holder[0], target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=pistols_that_fire)
 
     return total_non_pistol_damage_count + total_pistol_damage
 

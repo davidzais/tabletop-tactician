@@ -18,6 +18,7 @@ def test_pistol_rule_suppresses_pistols():
     )
    
     attacker_faction = "adeptus-astartes"
+    defender_faction = "orks"
 
     target = FieldedUnit(id="boyz", model_count=10, wargear=[])   # only .id is used as the crunch target    
     target_unit = unit_raw(target.id)
@@ -25,15 +26,15 @@ def test_pistol_rule_suppresses_pistols():
 
     rifle = weapon_raw(weapon_id="bolt-rifle", faction_id=attacker_faction)
     pistol = weapon_raw(weapon_id="bolt-pistol", faction_id=attacker_faction)
-    expected = weapon_damage(weapon_raw_dict=rifle, target_raw_dict=target_unit, models_firing=1)
-    expected +=  weapon_damage(weapon_raw_dict=pistol, target_raw_dict=target_unit, models_firing=4)
+    expected = weapon_damage(weapon_raw_dict=rifle, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=1)
+    expected +=  weapon_damage(weapon_raw_dict=pistol, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=4)
 
-    assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, phase=WeaponType.RANGED) == pytest.approx(expected)
+    assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, defender_faction_id=defender_faction, phase=WeaponType.RANGED) == pytest.approx(expected)
 
     melee_weapon = weapon_raw(weapon_id="close-combat-weapon", faction_id=attacker_faction)
-    expected_melee = weapon_damage(weapon_raw_dict=melee_weapon, target_raw_dict=target_unit, models_firing=5)   
+    expected_melee = weapon_damage(weapon_raw_dict=melee_weapon, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=5)   
     
-    assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, phase=WeaponType.MELEE) == pytest.approx(expected_melee)
+    assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, defender_faction_id=defender_faction, phase=WeaponType.MELEE) == pytest.approx(expected_melee)
 
     
 def test_matchup(army_a: Army, army_b: Army):
