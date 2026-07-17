@@ -7,7 +7,8 @@ here (that's combat_mechanics/damage.py).
 from functools import cache
 
 from wh40kdc import Dataset
-from tabletop_tactician.reference_data.roster import Army
+from tabletop_tactician.reference_data.roster import Army, FieldedUnit
+
 
 
 def get_converted_phase( phase: str) -> str:
@@ -78,6 +79,32 @@ def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str,str]
         unit_ability_holder[unit.id] = ability_holder
 
     return unit_ability_holder
+
+def wound_pool( unit: FieldedUnit ) -> int:     
+    profiles = {p["name"]: p["W"] for p in unit_raw(unit.id)["profiles"]}
+   
+    num_profiles = len(profiles)
+    total_wounds = 0
+
+    #if there is only one profile, its just that profiles Wound value times the number of models
+    if num_profiles == 1:
+        return unit.model_count * next(iter(profiles.values()))
+    
+    # if there is no compositions, there was no group_loadout from building the roster
+    if not unit.composition:
+        min_wound = get_min_wound(profiles)
+        return unit.model_count * min_wound
+    
+    for comp in unit.composition:
+        total_wounds += comp.count * profiles.get(comp.model, get_min_wound(profiles))
+
+    if total_wounds == 0:
+        raise ValueError("wound pool can not be 0")
+    
+    return total_wounds
+
+def get_min_wound(profiles: dict[str, int]) -> int:
+    return min(profiles.values())
 
 @cache
 def get_dataset() -> Dataset:

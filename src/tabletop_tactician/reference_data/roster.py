@@ -7,7 +7,7 @@ the codebase works with `army.faction_id`, `unit.id`, `wg.count` — dot access,
 autocomplete, and a red squiggle the moment you typo a field.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import wh40kdc
 
@@ -17,12 +17,17 @@ class Wargear:
     id: str          # weapon datasheet id, e.g. "bolt-rifle"  (flattened from ref.id)
     count: int       # how many models are carrying/firing it
 
+@dataclass 
+class UnitComposition:
+    model: str
+    count: int
 
 @dataclass
 class FieldedUnit:
     id: str                    # unit datasheet id, e.g. "intercessor-squad" (from ref.id)
     model_count: int
     wargear: list[Wargear]
+    composition: list[UnitComposition] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +57,9 @@ def load_roster(text: str) -> Army:
                 for w in u["wargear"]
                 if w["ref"]["id"] is not None  # skip weapons wh40kdc couldn't resolve to an id
             ],
+            composition=[UnitComposition(g["model_name"], g["count"])
+             for g in u.get("loadout_groups") or []] # this could be empty
+
         )
         for u in raw["units"]
     ]

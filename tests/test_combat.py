@@ -1,10 +1,10 @@
 import pytest
 from tabletop_tactician.models.profiles import WeaponType
-from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw
+from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw, wound_pool
 from tabletop_tactician.combat_mechanics.damage import weapon_damage, unit_damage
 from tabletop_tactician.reference_data.roster import Army
 from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups
-from tabletop_tactician.reference_data.roster import FieldedUnit, Wargear
+from tabletop_tactician.reference_data.roster import FieldedUnit, Wargear, UnitComposition
 
 def test_pistol_rule_suppresses_pistols():
   
@@ -50,3 +50,24 @@ def test_matchup(army_a: Army, army_b: Army):
     matchups = build_combat_matchups(attacking_army=attacking_army, defending_army=defending_army)
     
     assert len(matchups) == len(attacking_army.units) * len(defending_army.units) * 2
+
+
+def test_wound_pool():
+    #two profiles + composition → itemize: 9×1 + 1×2 = 11
+    #produces the following 2 profiles
+    #.[{'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 1, 'invuln_sv': None, 'name': 'Boy'},
+    #  {'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 2, 'invuln_sv': None, 'name': 'Boss Nob'}]
+    # so a unit of 9 boyz and 1 Nob 9×1 + 1×2 = 11 wounds
+    boyz = FieldedUnit(id="boyz", model_count=10, wargear=[],
+                       composition=[UnitComposition("Boss Nob", 1), UnitComposition("Boy", 9)])
+    assert wound_pool(boyz) == 11
+
+    # one profile → model_count × W, composition irrelevant: 5×2 = 10
+    nobz = FieldedUnit(id="nobz", model_count=5, wargear=[], composition=[])
+    assert wound_pool(nobz) == 10
+
+    # two profiles, no composition → model_count × min(W): 11 × min(1,2) = 11
+    gretchin = FieldedUnit(id="gretchin", model_count=11, wargear=[], composition=[])
+    assert wound_pool(gretchin) == 11
+
+

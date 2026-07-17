@@ -25,8 +25,8 @@ def load(path: Path) -> Army:
 
 def main() -> None:
     args = sys.argv[1:]
-    attacker_path = Path(args[0]) if len(args) > 0 else ROSTERS / "ba_1000.json"
-    defender_path = Path(args[1]) if len(args) > 1 else ROSTERS / "orks_1000.json"
+    attacker_path = Path(args[0]) if len(args) > 0 else ROSTERS / "ba_1000_gw.txt"
+    defender_path = Path(args[1]) if len(args) > 1 else ROSTERS / "orks_1000_gw.txt"
 
     attacker = load(attacker_path)
     defender = load(defender_path)

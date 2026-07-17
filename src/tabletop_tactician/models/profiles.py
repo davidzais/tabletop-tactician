@@ -66,5 +66,9 @@ class CombatMatchup:
     defender: str
     combat_phase: WeaponType
     damage: float
-
+    wound_pool: int
+    
+    @property
+    def fraction_destroyed(self) -> float:
+        return min(self.damage, self.wound_pool) / self.wound_pool
     
