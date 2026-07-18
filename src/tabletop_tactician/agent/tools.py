@@ -11,8 +11,8 @@ def get_threat_matrix( attacker: Army, defender: Army) -> list[dict]:
     
     matchups: list[CombatMatchup] = build_combat_matchups(attacking_army=attacker, defending_army=defender)       
 
-    header = "attacker,defender,phase,fraction_destroyed\n"
-    return header + "\n".join(f"{m.attacker},{m.defender},{m.combat_phase},{round(m.fraction_destroyed, 2)}" for m in matchups) 
+    header = "attacker,defender,phase,damage,wound_pool,fraction_destroyed\n"
+    return header + "\n".join(f"{m.attacker},{m.defender},{m.combat_phase},{round(m.damage, 2)},{m.wound_pool},{round(m.fraction_destroyed, 2)}" for m in matchups)
 #     return [
 #     {
 #         "attacker": m.attacker,
@@ -30,10 +30,10 @@ GET_THREAT_MATRIX_TOOL = {
         "name": "get_threat_matrix",
         "description": (
             "Get the matchup grid for one attack direction: for each of the attacker's units "
-            "against each of the defender's units, per phase (ranged, melee), the fraction of the "
-            "defender unit destroyed (0.0-1.0, overkill already removed). Call with attacker='me' to "
-            "see your offense, attacker='opponent' to see the threat against you. Call it twice to "
-            "compare both directions."
+            "against each of the defender's units, per phase (ranged, melee) — the expected damage, "
+            "the target's total wounds (wound_pool), and the fraction of the defender unit destroyed "
+            "(0.0-1.0, overkill already removed). Call with attacker='me' to see your offense, "
+            "attacker='opponent' to see the threat against you. Call it twice to compare both directions."
         ),
         "parameters": {
             "type": "object",
