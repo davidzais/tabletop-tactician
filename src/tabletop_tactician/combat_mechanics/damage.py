@@ -82,4 +82,4 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
 
 
 def is_pistol(weapon: dict) -> bool:
-    return any(kw["keyword_id"] == "pistol" for p in weapon["profiles"] for kw in p["keywords"])
+    return any(kw["keyword_id"] == "pistol" for p in weapon["profiles"] for kw in p.get("keywords", []))

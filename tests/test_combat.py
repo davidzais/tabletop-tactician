@@ -3,7 +3,7 @@ from tabletop_tactician.models.profiles import WeaponType
 from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw, wound_pool
 from tabletop_tactician.combat_mechanics.damage import weapon_damage, unit_damage
 from tabletop_tactician.reference_data.roster import Army
-from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups
+from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups, unique_labels
 from tabletop_tactician.reference_data.roster import FieldedUnit, Wargear, UnitComposition
 
 def test_pistol_rule_suppresses_pistols():
@@ -71,3 +71,6 @@ def test_wound_pool():
     assert wound_pool(gretchin) == 11
 
 
+def test_unique_labels():
+    units = [ FieldedUnit(id="boyz", model_count=10, wargear=[]), FieldedUnit(id="boyz", model_count=10, wargear=[]), FieldedUnit(id="warboss", model_count=5, wargear=[], composition=[])] 
+    assert unique_labels(units) == ["boyz #1", "boyz #2", "warboss"]
