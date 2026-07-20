@@ -1,10 +1,11 @@
 import pytest
 from tabletop_tactician.models.profiles import WeaponType
 from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw, wound_pool
-from tabletop_tactician.combat_mechanics.damage import weapon_damage, unit_damage
+from tabletop_tactician.combat_mechanics.damage import weapon_damage, unit_damage, pistol_damage
 from tabletop_tactician.reference_data.roster import Army
 from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups, unique_labels
 from tabletop_tactician.reference_data.roster import FieldedUnit, Wargear, UnitComposition
+
 
 def test_pistol_rule_suppresses_pistols():
   
@@ -74,3 +75,17 @@ def test_wound_pool():
 def test_unique_labels():
     units = [ FieldedUnit(id="boyz", model_count=10, wargear=[]), FieldedUnit(id="boyz", model_count=10, wargear=[]), FieldedUnit(id="warboss", model_count=5, wargear=[], composition=[])] 
     assert unique_labels(units) == ["boyz #1", "boyz #2", "warboss"]
+
+
+    
+
+def test_pistol_damage_allocation():
+    plasma, bolt = 0.5, 0.1
+    # budget 2, plasma better -> fire 2 plasma, bolts sit out
+    assert pistol_damage([(plasma, 4), (bolt, 8)], 2) == 2 * plasma
+    # budget 3, only 1 plasma -> spill into 2 bolt
+    assert pistol_damage([(plasma, 1), (bolt, 8)], 3) == plasma + 2 * bolt
+    # bolt listed FIRST but plasma better -> ranking still fires plasma first
+    assert pistol_damage([(bolt, 8), (plasma, 1)], 3) == plasma + 2 * bolt
+    # nothing fires
+    assert pistol_damage([(plasma, 4)], 0) == 0.0
