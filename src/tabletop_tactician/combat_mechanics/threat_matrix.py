@@ -12,7 +12,7 @@ def build_combat_matchups(attacking_army: Army, defending_army: Army) -> list[Co
        for (defender, d_label) in zip(defending_army.units, defender_labels):           
            for phase in (WeaponType.RANGED, WeaponType.MELEE):
                damage = unit_damage(attacker_unit=attacker, target_unit=defender, attacker_faction_id=attacking_army.faction_id, defender_faction_id=defending_army.faction_id, phase=phase)                               
-               current_matchup = CombatMatchup(attacker=a_label, defender=d_label, combat_phase=phase, damage=damage, wound_pool=wound_pool(defender))
+               current_matchup = CombatMatchup(attacker=a_label, defender=d_label, combat_phase=phase, damage=damage, wound_pool=wound_pool(defender), defender_points=defender.points)
                combat_matchups.append(current_matchup)
     return combat_matchups
 

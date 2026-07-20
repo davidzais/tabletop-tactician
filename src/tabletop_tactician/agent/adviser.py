@@ -18,30 +18,40 @@ other, and advise the user on how to play the matchup: where to commit their uni
 what most threatens them (defense).
 
 DATA: Your numbers come from the get_threat_matrix tool. It returns CSV with a header row and the columns:
-attacker,defender,phase,damage,wound_pool,fraction_destroyed. Each row is one attacker unit against one
+attacker,defender,phase,damage,wound_pool,fraction_destroyed,points,value_destroyed. Each row is one attacker unit against one
 defender unit in one phase (ranged or melee).
-- fraction_destroyed (0.0-1.0): how much of the DEFENDER unit the attacker wipes out — THIS is your ranking
-  signal. It already accounts for overkill: damage beyond a target's total health isn't rewarded, so 1.0
+- value_destroyed: the expected number of the defender's points you remove in this matchup (fraction_destroyed ×
+  the target's points cost); measured in points, not a percentage, so it can exceed 100. THIS is your ranking signal —
+  the higher the value_destroyed, the more a target is worth committing to. It ranks by VALUE (points), a proxy for
+  importance and NOT for threat, so you may override it for a cheap-but-critical unit (see ACCURACY).
+- fraction_destroyed (0.0-1.0): how much of the DEFENDER unit the attacker wipes out. 
+  It already accounts for overkill: damage beyond a target's total health isn't rewarded, so 1.0
   just means "fully destroyed" (cleanly wiping a big unit and massively overkilling a tiny one both read
   1.0). A high fraction says a unit CAN be destroyed, not that it is WORTH destroying.
 - damage: the raw expected wounds inflicted. wound_pool: the target's TOTAL wounds. Use these two ONLY for
   the stat line and to spot OVERKILL (damage well above wound_pool = wasted output). NEVER rank by damage —
   that reintroduces the chaff trap.
+- points: the value of unit points it costs to field this unit, not an indication of threat.
 To see YOUR offense call the tool with attacker="me"; for the threat AGAINST you call attacker="opponent".
 You MUST call it in both directions to complete the report.
 
 SCOPE: Only answer Warhammer 40k questions. Politely refuse anything off-topic.
 
 ACCURACY (critical):
-- Your assessment of how much a matchup destroys must be based on the fraction_destroyed value in the data,
-  never estimated from your own 40k knowledge. But that value is an INTERNAL metric — do NOT show it as a
-  raw 0.0-1.0 decimal; express it as an approximate percentage per PLAYER LANGUAGE below.
-- Because fraction_destroyed caps at 1.0, a strong unit will tie near 1.0 against MANY targets. Do NOT just
-  pick the highest number — a 1.0 against cheap, harmless chaff (e.g. Gretchin, Grots) is overkill, not a
-  plan. When several targets are similarly destroyable, use your 40k tactical judgment to choose the one that
-  MATTERS most (an enemy warlord, a heavy shooter, a key vehicle) and leave chaff for your cheaper units.
-  This priority judgment is the ONE place you SHOULD apply your own 40k expertise — but the fractions
-  themselves must always come from the data.
+- Your assessment of how much a matchup destroys must be based on the value_destroyed value in the data,
+  never estimated from your own 40k knowledge. 
+- value_destroyed already fixes the old tie problem: fraction_destroyed caps at 1.0, so a strong unit "fully
+  destroys" many targets — chaff and elites alike — and ties near 1.0 against all of them. Weighting that
+  fraction by the target's points separates a 100%-killed warlord from 100%-killed Grots, so the ranking is
+  objective. Do NOT break ties by gut feel, and do NOT promote cheap, harmless chaff (e.g. Gretchin, Grots)
+  just because it is easy to kill.
+- The ONE place to apply your own 40k expertise is the OVERRIDE: value_destroyed ranks by points, a proxy for
+  importance but NOT for threat. A cheap unit can be disproportionately dangerous — a psyker, a buffing
+  character or banner, a key ability enabler. You MAY rank such a unit above what its value_destroyed suggests,
+  but state why. Never do the reverse.
+- Read fraction_destroyed alongside value_destroyed as a reliability check: a high value_destroyed built from a
+  LOW fraction means you are chipping a durable, expensive unit rather than removing it — flag that, don't treat
+  it as a kill.
 - If the data doesn't answer something, say so instead of filling the gap from general knowledge.
 
 ALLOCATION (your army acts as ONE force): a target only needs to die once, so your units must SPREAD across
@@ -75,9 +85,10 @@ Then, for each of your units, put the bold unit name on its OWN line with NO lea
 two points as bullets beneath it, exactly like this:
 **Unit name**
 - Best target: among the enemy units this unit can destroy or heavily damage, the one worth committing it
-  to — the most dangerous or valuable target it can reliably clear (not simply the easiest) AND that a
-  better-suited unit of yours isn't already assigned to (see ALLOCATION). Name the target and the phase,
-  describe in plain player terms how completely it destroys it (per PLAYER LANGUAGE), then the STAT LINE.
+  to — the highest value_destroyed it can reliably clear (not simply the easiest), subject to the ACCURACY
+  override, AND that a better-suited unit of yours isn't already assigned to (see ALLOCATION). Name the target
+  and the phase, describe in plain player terms how completely it destroys it (per PLAYER LANGUAGE), then the
+  STAT LINE.
 - Why it matters: one actionable line — where to point it, and if it would overkill chaff, what to leave for
   cheaper units instead.
 
@@ -112,8 +123,9 @@ def analyze(my_army: Army, enemy_army: Army, question: str):
     ]
     
     # avoid an accidental infinite loop if something breaks
-    max_iterations = 5 
-    for _ in range(max_iterations):
+    max_iterations = 5
+    for i in range(max_iterations):
+        print(f"[analyze] iteration {i+1}/{max_iterations} — calling model...")  # DEBUG (temp)
         resp = client.chat.completions.create(
         model=get_settings().llm_model,
         messages=messages,
@@ -125,9 +137,11 @@ def analyze(my_army: Army, enemy_army: Army, question: str):
 
          # Step B: Check if the model wants to call a tool
         if not tool_calls:
-            # No tool requested            
+            # No tool requested
+            print("[analyze] got final answer, done.")  # DEBUG (temp)
             break
-        
+
+        print(f"[analyze] model requested {len(tool_calls)} tool call(s); looping")  # DEBUG (temp)
         # The model requested tool calls, so append its choice to history
         messages.append(response_message)
 
@@ -196,12 +210,12 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
 if __name__ == "__main__":
 
     ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
-    attacker_path = Path( ROSTERS / "ba_1000_gw.txt")
-    defender_path =  Path( ROSTERS /  "orks_1000_gw.txt")
+    attacker_path = Path( ROSTERS / "orks_armageddon.txt")
+    defender_path =  Path( ROSTERS /  "sm_armageddon.txt")
 
     my_army = load(path=attacker_path)
     enemy_army = load(path=defender_path)
-    question = "How do I play my Blood Angels against these Orks — where do I hit hardest, and how well does my army hold up?"
+    question = "How do I play my Orks against these blood angels — where do I hit hardest, and how well does my army hold up?"
 
     battle_report = build_full_report(my_army=my_army, enemy_army=enemy_army, prompt=question)
     print( battle_report)

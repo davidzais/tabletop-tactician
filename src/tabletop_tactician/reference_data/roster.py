@@ -27,6 +27,7 @@ class FieldedUnit:
     id: str                    # unit datasheet id, e.g. "intercessor-squad" (from ref.id)
     model_count: int
     wargear: list[Wargear]
+    points: int = 0
     composition: list[UnitComposition] = field(default_factory=list)
 
 
@@ -57,6 +58,7 @@ def load_roster(text: str) -> Army:
                 for w in u["wargear"]
                 if w["ref"]["id"] is not None  # skip weapons wh40kdc couldn't resolve to an id
             ],
+            points=u["points"],
             composition=[UnitComposition(g["model_name"], g["count"])
              for g in u.get("loadout_groups") or []] # this could be empty
 
