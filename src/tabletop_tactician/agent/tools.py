@@ -51,13 +51,11 @@ GET_THREAT_MATRIX_TOOL = {
 
 
 if __name__ == "__main__":   
-    from pprint import pprint 
-    ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
-    attacker_path = Path( ROSTERS / "orks_armageddon.txt")
-    defender_path =  Path( ROSTERS /  "sm_armageddon.txt")
+    from pprint import pprint
+    from tabletop_tactician.paths import MY_ARMY, ENEMY_ARMY
 
-    attacker = load(path=attacker_path)
-    defender = load(path=defender_path)        
+    attacker = load(path=MY_ARMY)
+    defender = load(path=ENEMY_ARMY)
 
     holder = assign_targets(attacker=attacker, defender=defender)
         

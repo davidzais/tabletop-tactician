@@ -7,7 +7,6 @@ from tabletop_tactician.models.profiles import WeaponType
 from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets
 import json
 import sys
-from pathlib import Path
 
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -223,12 +222,10 @@ def offensive_assignment_block(offensive_assignment: dict[str, tuple], dropped_u
 
 if __name__ == "__main__":
 
-    ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
-    attacker_path = Path( ROSTERS / "orks_armageddon_attached.json")
-    defender_path =  Path( ROSTERS /  "sm_armageddon.txt")
+    from tabletop_tactician.paths import MY_ARMY, ENEMY_ARMY
 
-    my_army = load(path=attacker_path)
-    enemy_army = load(path=defender_path)
+    my_army = load(path=MY_ARMY)
+    enemy_army = load(path=ENEMY_ARMY)
 
     question = "How do I play my army against the enemy army — where do I hit hardest, and how well does my army hold up?"
 

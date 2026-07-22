@@ -87,11 +87,9 @@ def assign_targets(attacker: Army, defender: Army) -> tuple[dict[str, tuple], li
     return holder, dropped_units
 
 if __name__ == "__main__":
-    from pathlib import Path
-    ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
-    FILE = "orks_1000_gw.txt"
-    text = (ROSTERS / FILE).read_text(encoding="utf-8")
-    army = load_roster(text)    
+    from tabletop_tactician.paths import MY_ARMY
+
+    army = load_roster(MY_ARMY.read_text(encoding="utf-8"))
     attacker_labels = unique_labels(army.units)
 
   
