@@ -4,6 +4,7 @@ from tabletop_tactician.reference_data.roster import Army
 from tabletop_tactician.reference_data.reference import get_unsupported_abilities
 from tabletop_tactician.agent.tools import GET_THREAT_MATRIX_TOOL, get_threat_matrix, load
 from tabletop_tactician.models.profiles import WeaponType
+from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets
 import json
 import sys
 from pathlib import Path
@@ -54,13 +55,17 @@ ACCURACY (critical):
   it as a kill.
 - If the data doesn't answer something, say so instead of filling the gap from general knowledge.
 
-ALLOCATION (your army acts as ONE force): a target only needs to die once, so your units must SPREAD across
-the enemy's key threats, not pile onto one. Before writing the Offensive section, mentally assign targets:
-walk the enemy's most valuable units and give each to the ONE of your units best-suited to kill it.
-HARD RULE: each enemy unit may be the "Best target" for AT MOST ONE of your units. If the target you'd pick
-is already assigned to a better-suited unit, choose your next-best target that you can still meaningfully
-damage — never name the same enemy unit as two units' Best target. (Redundant kills you may mention only in
-"Why it matters" as a fallback, e.g. "can finish the Weirdboy if X fails" — never as the Best target.)
+OFFENSIVE ASSIGNMENT (authoritative — do NOT re-allocate): the "Best target" for each of your units in the
+Offensive section is PROVIDED to you in the OFFENSIVE ASSIGNMENT supplied alongside the question. It is the
+optimal army-wide plan, already computed for you: every listed target is worth killing, each target is hit by
+at most ONE of your units (your army acts as ONE force), and each unit fights in its better phase. Use each
+unit's assigned target and phase EXACTLY as given — do not pick a different target, do not re-rank, do not
+second-guess it. A unit that appears with no assigned target has no worthwhile target: report it as a screen /
+objective-grabber, not a kill. You still get each pairing's supporting NUMBERS (damage, wound_pool,
+fraction_destroyed) from the get_threat_matrix data — the assignment says WHO hits WHAT; the matrix gives the
+figures. The only judgment you MAY add: if a cheap-but-critical enemy unit (a psyker, a buffing character) is
+left alone by this value-based plan, flag it in the relevant unit's "Why it matters" line — but never change
+an assigned Best target.
 
 PLAYER LANGUAGE: fraction_destroyed is an internal 0.0-1.0 value — never show it as a decimal ("1.0
 fraction" means nothing to a player). Express it instead as roughly what PERCENTAGE of the target unit is
@@ -84,11 +89,10 @@ Overall offensive summary: 2-3 sentences on your army's main offensive strengths
 Then, for each of your units, put the bold unit name on its OWN line with NO leading dash or bullet, then the
 two points as bullets beneath it, exactly like this:
 **Unit name**
-- Best target: among the enemy units this unit can destroy or heavily damage, the one worth committing it
-  to — the highest value_destroyed it can reliably clear (not simply the easiest), subject to the ACCURACY
-  override, AND that a better-suited unit of yours isn't already assigned to (see ALLOCATION). Name the target
-  and the phase, describe in plain player terms how completely it destroys it (per PLAYER LANGUAGE), then the
-  STAT LINE.
+- Best target: the target assigned to THIS unit in the OFFENSIVE ASSIGNMENT (already the optimal pick — do not
+  choose your own; see OFFENSIVE ASSIGNMENT). Name that target and its phase, describe in plain player terms how
+  completely it destroys it (per PLAYER LANGUAGE), then the STAT LINE. If the unit has no assigned target, say
+  plainly it has no worthwhile target and should screen or hold objectives instead.
 - Why it matters: one actionable line — where to point it, and if it would overkill chaff, what to leave for
   cheaper units instead.
 
@@ -114,18 +118,17 @@ def get_client() -> OpenAI:
 
 
 
-def analyze(my_army: Army, enemy_army: Army, question: str):
+def analyze(my_army: Army, enemy_army: Army, question: str, assignment_block: str):
     client = get_client()
-
+    
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": question}
+        {"role": "user", "content": question + "\n\n" + assignment_block }
     ]
     
     # avoid an accidental infinite loop if something breaks
     max_iterations = 5
-    for i in range(max_iterations):
-        print(f"[analyze] iteration {i+1}/{max_iterations} — calling model...")  # DEBUG (temp)
+    for i in range(max_iterations):        
         resp = client.chat.completions.create(
         model=get_settings().llm_model,
         messages=messages,
@@ -137,11 +140,10 @@ def analyze(my_army: Army, enemy_army: Army, question: str):
 
          # Step B: Check if the model wants to call a tool
         if not tool_calls:
-            # No tool requested
-            print("[analyze] got final answer, done.")  # DEBUG (temp)
+            # No tool requested            
             break
 
-        print(f"[analyze] model requested {len(tool_calls)} tool call(s); looping")  # DEBUG (temp)
+       
         # The model requested tool calls, so append its choice to history
         messages.append(response_message)
 
@@ -196,7 +198,9 @@ def deep_merge(dict1, dict2) -> dict:
     return dict1
 
 def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:    
-    resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt )
+    offensive_assignment, dropped_units = assign_targets(my_army, enemy_army)  
+    assignment_block = offensive_assignment_block(offensive_assignment=offensive_assignment, dropped_units=dropped_units)  
+    resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt, assignment_block=assignment_block)
 
     my_army_unsupported = get_unsupported_abilities_for_army(army=my_army) 
     enemy_army_unsupported = get_unsupported_abilities_for_army(army=enemy_army) 
@@ -207,6 +211,15 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
 
     return resp + "\n\n" + unsupported_abilities_text
 
+def offensive_assignment_block(offensive_assignment: dict[str, tuple], dropped_units: list[str]) -> str:
+    format_block: str = "OFFENSIVE ASSIGNMENT (your optimal offense — use these exact targets and phases):\n"
+    for key, value in offensive_assignment.items():
+        format_block += f"- {key} -> {value[0]}  ({value[1].value})\n"
+
+    for entry in dropped_units:
+        format_block += f"- {entry} -> no worthwhile targets\n"
+    return format_block
+
 if __name__ == "__main__":
 
     ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
@@ -215,7 +228,8 @@ if __name__ == "__main__":
 
     my_army = load(path=attacker_path)
     enemy_army = load(path=defender_path)
-    question = "How do I play my Orks against these blood angels — where do I hit hardest, and how well does my army hold up?"
+
+    question = "How do I play my army against the enemy army — where do I hit hardest, and how well does my army hold up?"
 
     battle_report = build_full_report(my_army=my_army, enemy_army=enemy_army, prompt=question)
     print( battle_report)

@@ -1,7 +1,8 @@
 from tabletop_tactician.reference_data.roster import Army, load_roster
 from tabletop_tactician.models.profiles import CombatMatchup
-from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups
+from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups, process_best_phase_matchup, build_value_matrix, assign_targets
 from pathlib import Path
+
 
 
 def load(path: Path) -> Army:
@@ -25,9 +26,11 @@ GET_THREAT_MATRIX_TOOL = {
             "(0.0-1.0, overkill already removed), the target's points cost (points), and "
             "value_destroyed. value_destroyed is the expected enemy POINTS removed "
             "(fraction_destroyed × the target's points cost); it is measured in points, NOT a "
-            "percentage, so it can exceed 100. Use value_destroyed as the primary signal for "
-            "ranking which target is worth attacking. Call with attacker='me' to see your offense, "
-            "attacker='opponent' to see the threat against you. Call it twice to compare both directions."
+            "percentage, so it can exceed 100. Your offensive target assignment is already computed "
+            "from value_destroyed and given to you separately, so use this grid for the supporting "
+            "numbers (damage, wounds, fraction) on each pairing and to work out the defensive section — "
+            "do not use it to re-pick your offensive targets. Call with attacker='me' to see your "
+            "offense, attacker='opponent' to see the threat against you. Call it twice for both directions."
         ),
         "parameters": {
             "type": "object",
@@ -50,13 +53,15 @@ GET_THREAT_MATRIX_TOOL = {
 if __name__ == "__main__":   
     from pprint import pprint 
     ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
-    attacker_path = Path( ROSTERS / "sm_armageddon.txt")
-    defender_path =  Path( ROSTERS /  "orks_armageddon.txt")
+    attacker_path = Path( ROSTERS / "orks_armageddon.txt")
+    defender_path =  Path( ROSTERS /  "sm_armageddon.txt")
 
     attacker = load(path=attacker_path)
-    defender = load(path=defender_path)
-    data = get_threat_matrix( attacker=attacker, defender=defender)
-    pprint(data )
+    defender = load(path=defender_path)        
 
+    holder = assign_targets(attacker=attacker, defender=defender)
+        
+    pprint(holder)
+   
 
     
