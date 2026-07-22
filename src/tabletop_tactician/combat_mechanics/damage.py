@@ -12,12 +12,12 @@ from tabletop_tactician.reference_data.reference import unit_raw, weapon_raw, ge
 
 
 # --- one weapon's damage stage ---
-def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction_id: str, phase: str, models_firing: int) -> float:
+def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction_id: str, phase: str, models_firing: int, target_unit_leaders: list[str]) -> float:
 
     # this conversion is neccessary for the defensive_buffs_for(), we use ranged/melee
     # but internally api uses shooting/fight
     converted_phase = get_converted_phase(phase=phase)
-    unit_input = {"unitId": target_raw_dict["id"], "factionId": defender_faction_id}
+    unit_input = {"unitId": target_raw_dict["id"], "factionId": defender_faction_id, "attachedUnitIds": target_unit_leaders}
     phase_context = {"phase": converted_phase}
 
     dataset = get_dataset()
@@ -28,7 +28,7 @@ def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction
             "target": {"unit": target_raw_dict, "profileIndex": 0},
             "modelsFiring": models_firing,
             "buffs": dataset.defensive_buffs_for(input=unit_input, context=phase_context),
-            "context": {},
+            "context": {}            
         }
     )
     return next(s for s in result["stages"] if s["name"] == "after-fnp")["expected"]
@@ -42,9 +42,10 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
     if phase == "melee":
         for wg in attacker_unit.wargear:
             wr = weapon_raw(weapon_id=wg.id, faction_id=attacker_faction_id)
-            if wr["type"] != phase:  # phase filter, off the weapon's own type
-                continue
-            total += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count)  # count = models firing THIS weapon
+            if wr is not None:
+                if wr["type"] != phase:  # phase filter, off the weapon's own type
+                    continue
+                total += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count, target_unit_leaders=target_unit.leaders)  # count = models firing THIS weapon
         return total
     else:
         pistol_count = 0
@@ -59,21 +60,22 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
         # pistol - non pistols will determine how many pistols fire, because all non pistols will fire over the pistol.
         for wg in attacker_unit.wargear:
             wr = weapon_raw(weapon_id=wg.id, faction_id=attacker_faction_id)
-            if wr["type"] != phase:  # phase filter, off the weapon's own type
-                continue
+            if wr is not None:
+                if wr["type"] != phase:  # phase filter, off the weapon's own type
+                    continue
 
-            if is_pistol(weapon=wr):
-                pistol_count += wg.count
-                # we want to collect these here, because if we just have the count, and not the actual pistol profile, we wont be able
-                # to get the sum from weapon damage, which takes the raw weapon profile
-                pistol_holder.append((wr, wg.count))
-            else:
-                non_pistol_count += wg.count
-                total_non_pistol_damage_count += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count)
+                if is_pistol(weapon=wr):
+                    pistol_count += wg.count
+                    # we want to collect these here, because if we just have the count, and not the actual pistol profile, we wont be able
+                    # to get the sum from weapon damage, which takes the raw weapon profile
+                    pistol_holder.append((wr, wg.count))
+                else:
+                    non_pistol_count += wg.count
+                    total_non_pistol_damage_count += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count, target_unit_leaders=target_unit.leaders) 
 
         pistols_that_fire = max(0, pistol_count - non_pistol_count)       
         #lets rank the pistols so we can fire the best ones first, if the unit has more than one
-        shot_damages = pistol_shot_damage(pistol_holder=pistol_holder, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase)
+        shot_damages = pistol_shot_damage(pistol_holder=pistol_holder, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase,  target_unit_leaders=target_unit.leaders)
         total_pistol_damage = pistol_damage(shot_damages, pistols_that_fire)       
 
     return total_non_pistol_damage_count + total_pistol_damage
@@ -95,10 +97,10 @@ def pistol_damage(pistols: list[tuple[float, int]], pistols_that_fire: int) -> f
 
 
 #since a unit might have Multiple pistol types, we want to fire the one that hits the hardest
-def pistol_shot_damage(pistol_holder: list[tuple], target_raw_dict: dict, defender_faction_id: str, phase: str,):
+def pistol_shot_damage(pistol_holder: list[tuple], target_raw_dict: dict, defender_faction_id: str, phase: str, target_unit_leaders: list[str]):
     pistol_weapons = []
     for (wr, count) in pistol_holder:
-        per_shot = weapon_damage(weapon_raw_dict=wr, target_raw_dict=target_raw_dict, defender_faction_id=defender_faction_id, phase=phase, models_firing=1)
+        per_shot = weapon_damage(weapon_raw_dict=wr, target_raw_dict=target_raw_dict, defender_faction_id=defender_faction_id, phase=phase, models_firing=1, target_unit_leaders=target_unit_leaders) 
         pistol_weapons.append( (per_shot, count) )
     
     return pistol_weapons 

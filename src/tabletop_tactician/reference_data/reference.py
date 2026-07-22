@@ -29,7 +29,7 @@ def unit_raw(unit_id: str) -> dict:
     return dataset.units.get_any(unit_id).raw
 
 
-def weapon_raw(weapon_id: str, faction_id: str) -> dict:
+def weapon_raw(weapon_id: str, faction_id: str) -> dict | None:
     dataset = get_dataset()
 
     # try to get the weapon from the actual faction, if its not available, fallback to getting the weapon
@@ -38,7 +38,7 @@ def weapon_raw(weapon_id: str, faction_id: str) -> dict:
     if weapon is None:
         weapon = dataset.weapons.get_any(id=weapon_id)
 
-    return weapon.raw
+    return weapon.raw if weapon is not None else None
 
 def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str,str]]:
     """List, per unit, the rules the damage engine could NOT account for.
@@ -58,7 +58,7 @@ def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str,str]
     for unit in army.units:
         # the library keys ability lookups by unit id + faction; phase is "shooting"/"fight"
         unit_input = {"unitId": unit.id, "factionId": army.faction_id}
-        phase_context = {"phase": converted_phase}
+        phase_context = {"phase": converted_phase,  "attackerAttached": unit.leader_attachment is not None}
                 
         # build this unit's {ability_name: description} map of gaps.
         # eligible_abilities -> every ability that could apply this phase (each entry

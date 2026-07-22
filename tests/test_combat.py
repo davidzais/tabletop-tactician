@@ -27,13 +27,13 @@ def test_pistol_rule_suppresses_pistols():
 
     rifle = weapon_raw(weapon_id="bolt-rifle", faction_id=attacker_faction)
     pistol = weapon_raw(weapon_id="bolt-pistol", faction_id=attacker_faction)
-    expected = weapon_damage(weapon_raw_dict=rifle, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=1)
-    expected +=  weapon_damage(weapon_raw_dict=pistol, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=4)
+    expected = weapon_damage(weapon_raw_dict=rifle, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=1, target_unit_leaders=[])
+    expected +=  weapon_damage(weapon_raw_dict=pistol, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=4, target_unit_leaders=[])
 
     assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, defender_faction_id=defender_faction, phase=WeaponType.RANGED) == pytest.approx(expected)
 
     melee_weapon = weapon_raw(weapon_id="close-combat-weapon", faction_id=attacker_faction)
-    expected_melee = weapon_damage(weapon_raw_dict=melee_weapon, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=5)   
+    expected_melee = weapon_damage(weapon_raw_dict=melee_weapon, target_raw_dict=target_unit, defender_faction_id=defender_faction, phase=WeaponType.RANGED, models_firing=5, target_unit_leaders=[])   
     
     assert unit_damage(attacker_unit=attacker, target_unit=target, attacker_faction_id=attacker_faction, defender_faction_id=defender_faction, phase=WeaponType.MELEE) == pytest.approx(expected_melee)
 

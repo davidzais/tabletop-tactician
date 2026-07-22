@@ -25,10 +25,13 @@ class UnitComposition:
 @dataclass
 class FieldedUnit:
     id: str                    # unit datasheet id, e.g. "intercessor-squad" (from ref.id)
-    model_count: int
+    model_count: int   
     wargear: list[Wargear]
     points: int = 0
     composition: list[UnitComposition] = field(default_factory=list)
+    leader_attachment: dict | None = None
+    leaders: list = field(default_factory=list)
+    
 
 
 @dataclass
@@ -60,9 +63,26 @@ def load_roster(text: str) -> Army:
             ],
             points=u["points"],
             composition=[UnitComposition(g["model_name"], g["count"])
-             for g in u.get("loadout_groups") or []] # this could be empty
+             for g in u.get("loadout_groups") or []],
+            leader_attachment=u['leader_attachment'] # this could be empty
 
         )
         for u in raw["units"]
     ]
+
+    assign_leader_to_units( units)
     return Army(faction_id=raw["faction_id"], units=units)
+
+
+def assign_leader_to_units(units: list[FieldedUnit]):  
+    leader_attachments: list[FieldedUnit] = [ u for u in units if u.leader_attachment is not None]
+
+    for leader in leader_attachments:
+        leader_id = leader.id
+        target_unit_id = leader.leader_attachment["bodyguard_ref"]["id"]
+
+        #for now if there are multiple units, just grab the first one
+        for unit in units:
+            if unit.id == target_unit_id:
+                unit.leaders.append(leader_id)               
+                break
