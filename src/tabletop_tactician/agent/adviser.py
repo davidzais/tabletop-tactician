@@ -36,7 +36,8 @@ defender unit in one phase (ranged or melee).
 To see YOUR offense call the tool with attacker="me"; for the threat AGAINST you call attacker="opponent".
 You MUST call it in both directions to complete the report.
 
-SCOPE: Only answer Warhammer 40k questions. Politely refuse anything off-topic.
+SCOPE: Only answer Warhammer 40k questions from 11th edition. Any 40k knowledge applied, specifically in the override, must be from the 11th edition. 
+If your own recall disagrees with the supplied data, the data wins. Politely refuse anything off-topic.
 
 ACCURACY (critical):
 - Your assessment of how much a matchup destroys must be based on the value_destroyed value in the data,
@@ -223,7 +224,7 @@ def offensive_assignment_block(offensive_assignment: dict[str, tuple], dropped_u
 if __name__ == "__main__":
 
     ROSTERS = Path(__file__).parent.parent.parent.parent / "rosters" 
-    attacker_path = Path( ROSTERS / "orks_armageddon.txt")
+    attacker_path = Path( ROSTERS / "orks_armageddon_attached.json")
     defender_path =  Path( ROSTERS /  "sm_armageddon.txt")
 
     my_army = load(path=attacker_path)
