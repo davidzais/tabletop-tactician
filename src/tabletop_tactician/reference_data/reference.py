@@ -8,6 +8,7 @@ from functools import cache
 
 from wh40kdc import Dataset
 from tabletop_tactician.reference_data.roster import Army, FieldedUnit
+from dataclasses import dataclass, replace
 
 
 
@@ -96,7 +97,7 @@ def wound_pool( unit: FieldedUnit ) -> int:
         return unit.model_count * min_wound
     
     for comp in unit.composition:
-        total_wounds += comp.count * profiles.get(comp.model, get_min_wound(profiles))
+        total_wounds += comp.count * profiles.get(comp.model, get_min_wound(profiles))    
 
     if total_wounds == 0:
         raise ValueError("wound pool can not be 0")
@@ -105,6 +106,37 @@ def wound_pool( unit: FieldedUnit ) -> int:
 
 def get_min_wound(profiles: dict[str, int]) -> int:
     return min(profiles.values())
+
+
+def merge_leaders_with_units(army: Army) -> Army:
+
+    merged_units: list[FieldedUnit] = []
+    for unit in army.units:        
+        if unit.leader_attachment is not None:
+            continue
+        elif len(unit.leaders) > 0:
+            # this unit is the "leader" of another unit, so for the merged army for combat, he is no longer a single unit
+            # in the army list of units, and getss added to the FilededUnit of the unit he leads
+            unit_leader = get_unit_by_id( unit_id=unit.leaders[0], units=army.units)
+            
+            merged_unit = FieldedUnit(id=unit.id,
+                                    model_count=unit.model_count + unit_leader.model_count,
+                                    wargear=unit.wargear + unit_leader.wargear,
+                                    points=unit.points + unit_leader.points,
+                                    wounds=wound_pool(unit) + wound_pool(unit_leader),
+                                    composition=unit.composition + unit_leader.composition,
+                                    leader_attachment=unit.leader_attachment,
+                                    leaders=unit.leaders)
+            merged_units.append(merged_unit)
+        else:                       
+            merged_units.append( replace(unit, wounds=wound_pool(unit)))
+            continue
+ 
+    return Army(faction_id=army.faction_id, units=merged_units)
+
+def get_unit_by_id( unit_id: str, units:list[FieldedUnit]) -> FieldedUnit:
+    target = [unit for unit in units if unit.id == unit_id]
+    return target[0]
 
 @cache
 def get_dataset() -> Dataset:

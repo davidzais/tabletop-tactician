@@ -1,20 +1,26 @@
 from tabletop_tactician.models.profiles import  WeaponType, CombatMatchup
 from tabletop_tactician.combat_mechanics.damage import unit_damage
 from tabletop_tactician.reference_data.roster import Army, FieldedUnit,  load_roster
-from tabletop_tactician.reference_data.reference import wound_pool
+from tabletop_tactician.reference_data.reference import wound_pool, merge_leaders_with_units
 from collections import Counter, defaultdict
 from scipy.optimize import linear_sum_assignment
 
 
 def build_combat_matchups(attacking_army: Army, defending_army: Army) -> list[CombatMatchup]:   
+    
+    # this takes the original roster Army and merges leaders into units, and removes them as individual characters from the list:
+    # ie carries the painboy attachment into its associated boyz mob
+    merged_attacker = merge_leaders_with_units(attacking_army)
+    merged_defender = merge_leaders_with_units( defending_army)
+
     combat_matchups: list[CombatMatchup] = []
-    attacker_labels = unique_labels(attacking_army.units)
-    defender_labels = unique_labels(defending_army.units)
-    for (attacker, a_label) in zip(attacking_army.units, attacker_labels):
-       for (defender, d_label) in zip(defending_army.units, defender_labels):           
+    attacker_labels = unique_labels(merged_attacker.units)
+    defender_labels = unique_labels(merged_defender.units)
+    for (attacker, a_label) in zip(merged_attacker.units, attacker_labels):
+       for (defender, d_label) in zip(merged_defender.units, defender_labels):           
            for phase in (WeaponType.RANGED, WeaponType.MELEE):
-               damage = unit_damage(attacker_unit=attacker, target_unit=defender, attacker_faction_id=attacking_army.faction_id, defender_faction_id=defending_army.faction_id, phase=phase)                               
-               current_matchup = CombatMatchup(attacker=a_label, defender=d_label, combat_phase=phase, damage=damage, wound_pool=wound_pool(defender), defender_points=defender.points)
+               damage = unit_damage(attacker_unit=attacker, target_unit=defender, attacker_faction_id=merged_attacker.faction_id, defender_faction_id=merged_defender.faction_id, phase=phase)                               
+               current_matchup = CombatMatchup(attacker=a_label, defender=d_label, combat_phase=phase, damage=damage, wound_pool=defender.wounds, defender_points=defender.points)
                combat_matchups.append(current_matchup)
     return combat_matchups
 
@@ -54,6 +60,7 @@ def unique_labels(units: list[FieldedUnit]) -> list[str]:
     return labels
 
 def assign_targets(attacker: Army, defender: Army) -> tuple[dict[str, tuple], list]:
+
     # build all the combat matchups
     matchups  = build_combat_matchups(attacker, defender)
 

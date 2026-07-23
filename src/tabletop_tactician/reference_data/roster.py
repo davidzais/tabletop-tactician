@@ -28,6 +28,7 @@ class FieldedUnit:
     model_count: int   
     wargear: list[Wargear]
     points: int = 0
+    wounds: int = 0
     composition: list[UnitComposition] = field(default_factory=list)
     leader_attachment: dict | None = None
     leaders: list = field(default_factory=list)
@@ -84,5 +85,7 @@ def assign_leader_to_units(units: list[FieldedUnit]):
         #for now if there are multiple units, just grab the first one
         for unit in units:
             if unit.id == target_unit_id:
-                unit.leaders.append(leader_id)               
+                unit.leaders.append(leader_id)                        
                 break
+
+
