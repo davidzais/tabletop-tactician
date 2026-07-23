@@ -113,24 +113,38 @@ def merge_leaders_with_units(army: Army) -> Army:
     merged_units: list[FieldedUnit] = []
     for unit in army.units:        
         if unit.leader_attachment is not None:
+            # this unit joined a squad, so it's no longer a unit of its own
             continue
-        elif len(unit.leaders) > 0:
-            # this unit is the "leader" of another unit, so for the merged army for combat, he is no longer a single unit
-            # in the army list of units, and getss added to the FilededUnit of the unit he leads
-            unit_leader = get_unit_by_id( unit_id=unit.leaders[0], units=army.units)
-            
-            merged_unit = FieldedUnit(id=unit.id,
-                                    model_count=unit.model_count + unit_leader.model_count,
-                                    wargear=unit.wargear + unit_leader.wargear,
-                                    points=unit.points + unit_leader.points,
-                                    wounds=wound_pool(unit) + wound_pool(unit_leader),
-                                    composition=unit.composition + unit_leader.composition,
-                                    leader_attachment=unit.leader_attachment,
-                                    leaders=unit.leaders)
-            merged_units.append(merged_unit)
-        else:                       
-            merged_units.append( replace(unit, wounds=wound_pool(unit)))
+
+        if not unit.leaders:
+            # nobody joined this unit — pass it through, just filling in its wounds
+            merged_units.append(replace(unit, wounds=wound_pool(unit)))
             continue
+
+        # someone joined this squad. gather the squad and its leaders into one list —
+        # "the pieces of the combined unit" — then every total is a sum over the pieces.
+        leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]
+        parts = [unit] + leaders
+
+
+        # gather every part's weapons and models into two flat lists
+        all_wargear = []
+        all_composition = []
+        for part in parts:
+            all_wargear += part.wargear
+            all_composition += part.composition
+
+        merged_unit = FieldedUnit(
+            id=unit.id,
+            model_count=sum(part.model_count for part in parts),
+            wargear=all_wargear,
+            points=sum(part.points for part in parts),
+            wounds=sum(wound_pool(part) for part in parts),
+            composition=all_composition,
+            leader_attachment=unit.leader_attachment,
+            leaders=unit.leaders,
+        )
+        merged_units.append(merged_unit)       
  
     return Army(faction_id=army.faction_id, units=merged_units)
 
