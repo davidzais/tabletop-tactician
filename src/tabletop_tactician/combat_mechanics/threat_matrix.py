@@ -59,6 +59,31 @@ def unique_labels(units: list[FieldedUnit]) -> list[str]:
             labels.append(unit.id)
     return labels
 
+
+def build_name_lookup(army: Army) -> dict[str, str]:
+    """Translate each unit's internal label into the readable name shown in the report.
+
+    The matrix works in labels like "boyz" (or "boyz #2" when an army fields two
+    squads with the same id). A player should read "Boyz with ( Painboy )", not
+    "boyz", so this builds a lookup {label: readable name}, one entry per unit.
+
+    Pass the MERGED army (the one build_combat_matchups works from), so the merged
+    squads carry their "with (leader)" names. When a label carries a " #2" tag (a
+    duplicated unit), the readable name keeps the same tag, so two squads with the
+    same name still read as distinct.
+    """
+    labels = unique_labels(army.units)
+
+    name_lookup: dict[str, str] = {}
+    for label, unit in zip(labels, army.units):
+        # A label is either the bare id ("boyz") or the id plus a tag ("boyz #2").
+        # Strip the id off the front; whatever's left is the tag (or an empty string).
+        tag = label.removeprefix(unit.id)
+        name_lookup[label] = unit.name + tag
+
+    return name_lookup
+
+
 def assign_targets(attacker: Army, defender: Army) -> tuple[dict[str, tuple], list]:
 
     # build all the combat matchups

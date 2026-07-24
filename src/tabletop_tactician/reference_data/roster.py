@@ -25,6 +25,7 @@ class UnitComposition:
 @dataclass
 class FieldedUnit:
     id: str                    # unit datasheet id, e.g. "intercessor-squad" (from ref.id)
+    name: str
     model_count: int   
     wargear: list[Wargear]
     points: int = 0
@@ -46,7 +47,8 @@ def load_roster(text: str) -> Army:
 
     Raises ValueError if wh40kdc can't import it.
     """
-    res = wh40kdc.try_import_roster(text)
+    res = wh40kdc.try_import_roster(text)    
+    
     if not res["ok"]:
         raise ValueError(
             f"Failed to import roster: {res.get('roster', {}).get('diagnostics')}"
@@ -56,6 +58,7 @@ def load_roster(text: str) -> Army:
     units = [
         FieldedUnit(
             id=u["ref"]["id"],
+            name=u["ref"]["raw_name"],
             model_count=u["model_count"],
             wargear=[
                 Wargear(id=w["ref"]["id"], count=w["count"])

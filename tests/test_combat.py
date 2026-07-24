@@ -14,6 +14,7 @@ def test_pistol_rule_suppresses_pistols():
     # the player will be fireing the rifle, not the pistol
     attacker = FieldedUnit(
         id="intercessor-squad",
+        name="Intercessor Squad",
         model_count=5,
         wargear=[Wargear(id="bolt-rifle", count=1), Wargear(id="bolt-pistol", count=5), Wargear(id="close-combat-weapon", count=5)],
     )
@@ -21,7 +22,7 @@ def test_pistol_rule_suppresses_pistols():
     attacker_faction = "adeptus-astartes"
     defender_faction = "orks"
 
-    target = FieldedUnit(id="boyz", model_count=10, wargear=[])   # only .id is used as the crunch target    
+    target = FieldedUnit(id="boyz", name="Boyz", model_count=10, wargear=[])   # only .id is used as the crunch target    
     target_unit = unit_raw(target.id)
 
 
@@ -59,21 +60,21 @@ def test_wound_pool():
     #.[{'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 1, 'invuln_sv': None, 'name': 'Boy'},
     #  {'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 2, 'invuln_sv': None, 'name': 'Boss Nob'}]
     # so a unit of 9 boyz and 1 Nob 9×1 + 1×2 = 11 wounds
-    boyz = FieldedUnit(id="boyz", model_count=10, wargear=[],
+    boyz = FieldedUnit(id="boyz", name="Boyz", model_count=10, wargear=[],
                        composition=[UnitComposition("Boss Nob", 1), UnitComposition("Boy", 9)])
     assert wound_pool(boyz) == 11
 
     # one profile → model_count × W, composition irrelevant: 5×2 = 10
-    nobz = FieldedUnit(id="nobz", model_count=5, wargear=[], composition=[])
+    nobz = FieldedUnit(id="nobz", name="Nobz", model_count=5, wargear=[], composition=[])
     assert wound_pool(nobz) == 10
 
     # two profiles, no composition → model_count × min(W): 11 × min(1,2) = 11
-    gretchin = FieldedUnit(id="gretchin", model_count=11, wargear=[], composition=[])
+    gretchin = FieldedUnit(id="gretchin",name="Gretchin", model_count=11, wargear=[], composition=[])
     assert wound_pool(gretchin) == 11
 
 
 def test_unique_labels():
-    units = [ FieldedUnit(id="boyz", model_count=10, wargear=[]), FieldedUnit(id="boyz", model_count=10, wargear=[]), FieldedUnit(id="warboss", model_count=5, wargear=[], composition=[])] 
+    units = [ FieldedUnit(id="boyz", name="Boyz",  model_count=10, wargear=[]), FieldedUnit(id="boyz",name="Boyz", model_count=10, wargear=[]), FieldedUnit(id="warboss", name="Warboss", model_count=5, wargear=[], composition=[])] 
     assert unique_labels(units) == ["boyz #1", "boyz #2", "warboss"]
 
 

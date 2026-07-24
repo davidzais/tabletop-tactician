@@ -1,6 +1,7 @@
 from tabletop_tactician.reference_data.roster import Army, load_roster
 from tabletop_tactician.models.profiles import CombatMatchup
-from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups, process_best_phase_matchup, build_value_matrix, assign_targets
+from tabletop_tactician.reference_data.reference import merge_leaders_with_units
+from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups, build_name_lookup
 from pathlib import Path
 
 
@@ -9,11 +10,13 @@ def load(path: Path) -> Army:
     return load_roster(text=path.read_text(encoding="utf-8"))
 
 def get_threat_matrix( attacker: Army, defender: Army) -> list[dict]:
-    
+
+    attacker_label_lookup = build_name_lookup(merge_leaders_with_units(attacker))
+    defender_label_lookup = build_name_lookup(merge_leaders_with_units(defender))
     matchups: list[CombatMatchup] = build_combat_matchups(attacking_army=attacker, defending_army=defender)       
 
     header = "attacker,defender,phase,damage,wound_pool,fraction_destroyed,points,value_destroyed\n"
-    return header + "\n".join(f"{m.attacker},{m.defender},{m.combat_phase},{round(m.damage, 2)},{m.wound_pool},{round(m.fraction_destroyed, 2)},{m.defender_points},{round(m.value_destroyed, 2)}" for m in matchups)
+    return header + "\n".join(f"{attacker_label_lookup[m.attacker]},{defender_label_lookup[m.defender]},{m.combat_phase},{round(m.damage, 2)},{m.wound_pool},{round(m.fraction_destroyed, 2)},{m.defender_points},{round(m.value_destroyed, 2)}" for m in matchups)
 
 GET_THREAT_MATRIX_TOOL = {
     "type": "function",
@@ -56,10 +59,10 @@ if __name__ == "__main__":
 
     attacker = load(path=MY_ARMY)
     defender = load(path=ENEMY_ARMY)
-
-    holder = assign_targets(attacker=attacker, defender=defender)
+    print( get_threat_matrix(attacker, defender))
+    #holder = assign_targets(attacker=attacker, defender=defender)
         
-    pprint(holder)
+    #pprint(holder)
    
 
     

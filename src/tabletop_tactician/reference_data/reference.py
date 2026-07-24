@@ -111,7 +111,7 @@ def get_min_wound(profiles: dict[str, int]) -> int:
 def merge_leaders_with_units(army: Army) -> Army:
 
     merged_units: list[FieldedUnit] = []
-    for unit in army.units:        
+    for unit in army.units:              
         if unit.leader_attachment is not None:
             # this unit joined a squad, so it's no longer a unit of its own
             continue
@@ -121,9 +121,12 @@ def merge_leaders_with_units(army: Army) -> Army:
             merged_units.append(replace(unit, wounds=wound_pool(unit)))
             continue
 
+       
         # someone joined this squad. gather the squad and its leaders into one list —
         # "the pieces of the combined unit" — then every total is a sum over the pieces.
-        leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]
+        #leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]       
+        leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]  
+         
         parts = [unit] + leaders
 
 
@@ -133,9 +136,11 @@ def merge_leaders_with_units(army: Army) -> Army:
         for part in parts:
             all_wargear += part.wargear
             all_composition += part.composition
-
+        leader_names = ", ".join([l.name for l in leaders])
+        
         merged_unit = FieldedUnit(
             id=unit.id,
+            name=f"{unit.name} with ( {leader_names} )",
             model_count=sum(part.model_count for part in parts),
             wargear=all_wargear,
             points=sum(part.points for part in parts),
@@ -149,7 +154,7 @@ def merge_leaders_with_units(army: Army) -> Army:
     return Army(faction_id=army.faction_id, units=merged_units)
 
 def get_unit_by_id( unit_id: str, units:list[FieldedUnit]) -> FieldedUnit:
-    target = [unit for unit in units if unit.id == unit_id]
+    target = [unit for unit in units if unit.id == unit_id]  
     return target[0]
 
 @cache

@@ -1,10 +1,10 @@
 from openai import OpenAI
 from tabletop_tactician.config import get_settings
 from tabletop_tactician.reference_data.roster import Army
-from tabletop_tactician.reference_data.reference import get_unsupported_abilities
+from tabletop_tactician.reference_data.reference import get_unsupported_abilities, merge_leaders_with_units
 from tabletop_tactician.agent.tools import GET_THREAT_MATRIX_TOOL, get_threat_matrix, load
 from tabletop_tactician.models.profiles import WeaponType
-from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets
+from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup
 import json
 import sys
 
@@ -197,9 +197,11 @@ def deep_merge(dict1, dict2) -> dict:
             dict1[key] = value
     return dict1
 
-def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:    
+def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:   
+    attacker_label_lookup = build_name_lookup(merge_leaders_with_units(my_army))
+    defender_label_lookup = build_name_lookup(merge_leaders_with_units(enemy_army))
     offensive_assignment, dropped_units = assign_targets(my_army, enemy_army)  
-    assignment_block = offensive_assignment_block(offensive_assignment=offensive_assignment, dropped_units=dropped_units)  
+    assignment_block = offensive_assignment_block(offensive_assignment=offensive_assignment, attacker_lookup_label=attacker_label_lookup, defender_lookup_label=defender_label_lookup,  dropped_units=dropped_units)  
     resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt, assignment_block=assignment_block)
 
     my_army_unsupported = get_unsupported_abilities_for_army(army=my_army) 
@@ -211,13 +213,13 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
 
     return resp + "\n\n" + unsupported_abilities_text
 
-def offensive_assignment_block(offensive_assignment: dict[str, tuple], dropped_units: list[str]) -> str:
+def offensive_assignment_block(offensive_assignment: dict[str, tuple], attacker_lookup_label: dict[str,str], defender_lookup_label: dict[str,str], dropped_units: list[str]) -> str:
     format_block: str = "OFFENSIVE ASSIGNMENT (your optimal offense — use these exact targets and phases):\n"
     for key, value in offensive_assignment.items():
-        format_block += f"- {key} -> {value[0]}  ({value[1].value})\n"
+        format_block += f"- {attacker_lookup_label[key]} -> {defender_lookup_label[value[0]]}  ({value[1].value})\n"
 
     for entry in dropped_units:
-        format_block += f"- {entry} -> no worthwhile targets\n"
+        format_block += f"- {attacker_lookup_label[entry]} -> no worthwhile targets\n"
     return format_block
 
 if __name__ == "__main__":
