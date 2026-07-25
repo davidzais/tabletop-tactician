@@ -69,10 +69,13 @@ def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str,str]
         # ability.describe() -> the plain-English text we show the user.
         ability_holder: dict[str,str] = {}
         for entry in dataset.eligible_abilities(unit_input, converted_phase):           
-            ability = entry["ability"]            
-            diagnostics = ability.describe_buffs(entry["source"], phase_context, "target")  
-            if diagnostics["unsupported"]:         
-                ability_holder[ability.name] = ability.describe()  
+            ability = entry["ability"]                     
+            diagnostics = ability.describe_buffs(entry["source"], phase_context, "target")                        
+            if diagnostics["unsupported"]: 
+                 #these are always attachment abilities, no effect on combat 
+                 if ability.raw["effect"]["type"] == "ability-grant":
+                                continue                         
+                 ability_holder[ability.name] = ability.describe()  
        
         # skip units that had no gaps at all - they don't belong in the report
         if len(ability_holder) == 0:
@@ -80,6 +83,66 @@ def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str,str]
         unit_ability_holder[unit.id] = ability_holder
 
     return unit_ability_holder
+
+def get_attachement_buffs( army: Army, phase: str) -> dict[str, str]:
+    merged = merge_leaders_with_units(army)          # so squads carry their .leaders and merged names
+    dataset = get_dataset()
+    result = {}
+
+    for unit in merged.units:
+        if len(unit.leaders) == 0:                    # nobody joined this squad -> nothing to credit
+            continue
+
+        
+        buffs = dataset.defensive_buffs_for(
+                        input   = {"unitId": unit.id,
+                                "factionId": army.faction_id,
+                                "attachedUnitIds": unit.leaders},
+                        context = {"phase": get_converted_phase(phase)})
+
+        buffs_for_this_unit = {}
+        for buff in buffs:
+            leader_id = buff["source"]["sourceUnitId"]
+            # keep ONLY buffs that came from an attached leader (not the squad's own rules)
+            if leader_id in unit.leaders:
+                label   = describe_buff(buff["contribution"])     # "Feel No Pain 5+"  (helper below)
+                pretty  = leader_id.replace('-', ' ').title()     # "painboy" -> "Painboy"
+                buffs_for_this_unit[label] = pretty
+
+        if buffs_for_this_unit:
+            result[unit.name] = buffs_for_this_unit
+
+    return result
+
+def describe_buff( contribution: dict[str, object] )-> str:
+    # example of what the contribution contains
+    # {'type': 'wound-mod', 'value': -1}    
+    # {'type': 'feel-no-pain', 'threshold': 6}
+    #...
+    buff_type = contribution["type"]
+    type_val = buff_type.replace('-', ' ').title()
+
+    if "threshold" in contribution:
+        # as of 7/25/26 these are the only ones that im aware of, that may change
+        # in the future so guard against it in case there may at some point
+        # that isnt a + modifier
+        if buff_type in ("feel-no-pain", "invulnerable-save"):
+            return f"{type_val} {contribution["threshold"]}+"
+    
+    if "value" in contribution:
+        val = contribution["value"]                
+        if buff_type == "hit-mod":
+            return f"{val:+d} to be hit"        
+        elif buff_type == "toughness-mod":
+            return f"{val:+d} Toughness" 
+        elif buff_type == "damage-reduction":
+            return f"Damage -{val}"
+        elif buff_type == "wound-mod":
+            return f"{val:+d} to be wounded"       
+        else:
+            return type_val 
+
+    return type_val   
 
 def wound_pool( unit: FieldedUnit ) -> int:     
     profiles = {p["name"]: p["W"] for p in unit_raw(unit.id)["profiles"]}
@@ -109,7 +172,6 @@ def get_min_wound(profiles: dict[str, int]) -> int:
 
 
 def merge_leaders_with_units(army: Army) -> Army:
-
     merged_units: list[FieldedUnit] = []
     for unit in army.units:              
         if unit.leader_attachment is not None:
@@ -123,10 +185,8 @@ def merge_leaders_with_units(army: Army) -> Army:
 
        
         # someone joined this squad. gather the squad and its leaders into one list —
-        # "the pieces of the combined unit" — then every total is a sum over the pieces.
-        #leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]       
-        leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]  
-         
+        # "the pieces of the combined unit" — then every total is a sum over the pieces.              
+        leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]                   
         parts = [unit] + leaders
 
 

@@ -1,7 +1,7 @@
 from openai import OpenAI
 from tabletop_tactician.config import get_settings
 from tabletop_tactician.reference_data.roster import Army
-from tabletop_tactician.reference_data.reference import get_unsupported_abilities, merge_leaders_with_units
+from tabletop_tactician.reference_data.reference import get_unsupported_abilities, merge_leaders_with_units, get_attachement_buffs
 from tabletop_tactician.agent.tools import GET_THREAT_MATRIX_TOOL, get_threat_matrix, load
 from tabletop_tactician.models.profiles import WeaponType
 from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup
@@ -118,12 +118,12 @@ def get_client() -> OpenAI:
 
 
 
-def analyze(my_army: Army, enemy_army: Army, question: str, assignment_block: str):
+def analyze(my_army: Army, enemy_army: Army, question: str, assignment_block: str, attachment_buffs_block: str):
     client = get_client()
     
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": question + "\n\n" + assignment_block }
+        {"role": "user", "content": question + "\n\n" + assignment_block  + "\n\n" + attachment_buffs_block}
     ]
     
     # avoid an accidental infinite loop if something breaks
@@ -172,7 +172,14 @@ def get_unsupported_abilities_for_army(army: Army ) -> dict[str, dict[str,str]]:
     
     # return the deep merged dictionary
     return deep_merge(my_army_unsupported_ranged, my_army_unsupported_melee)
- 
+
+def get_attachment_buffs_for_army(army: Army)-> dict[str, dict[str, str]]:
+    my_army_buffs_ranged = get_attachement_buffs(army, WeaponType.RANGED)    
+    my_army_buffs_melee = get_attachement_buffs(army, WeaponType.MELEE)
+
+    return deep_merge(my_army_buffs_ranged, my_army_buffs_melee)
+        
+
 def get_unsupported_abilities_formatted(unsupported_abilities: dict[str, dict[str,str]] ) -> str:
     response: str = ""
     for key, rules in unsupported_abilities.items():
@@ -187,6 +194,17 @@ def get_unsupported_abilities_formatted(unsupported_abilities: dict[str, dict[st
         response += "\n"
 
     return response          
+def get_attachment_buffs_formatted(attachement_buffs: dict[str, dict[str, str]]):
+    response: str = ""
+    for key, buff in attachement_buffs.items():
+        unit = key 
+        current_buff = ""
+        for buff_label, leader_name in buff.items():
+            current_buff += f"{buff_label} (from {leader_name})\n"
+
+        response +=  f"{unit}: {current_buff}"
+    return response
+
 
 def deep_merge(dict1, dict2) -> dict:
     """Recursively merges dict2 into dict1."""
@@ -200,9 +218,13 @@ def deep_merge(dict1, dict2) -> dict:
 def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:   
     attacker_label_lookup = build_name_lookup(merge_leaders_with_units(my_army))
     defender_label_lookup = build_name_lookup(merge_leaders_with_units(enemy_army))
+
     offensive_assignment, dropped_units = assign_targets(my_army, enemy_army)  
     assignment_block = offensive_assignment_block(offensive_assignment=offensive_assignment, attacker_lookup_label=attacker_label_lookup, defender_lookup_label=defender_label_lookup,  dropped_units=dropped_units)  
-    resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt, assignment_block=assignment_block)
+
+    attatchment_buffs = get_attachment_buffs_for_army(my_army)
+    buff_block = get_attachement_bluffs_block( attatchment_buffs )
+    resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt, assignment_block=assignment_block, attachment_buffs_block=buff_block)
 
     my_army_unsupported = get_unsupported_abilities_for_army(army=my_army) 
     enemy_army_unsupported = get_unsupported_abilities_for_army(army=enemy_army) 
@@ -210,8 +232,18 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
     unsupported_abilities_text  = "---\n## ⚠️ Not Accounted For\n\nThe damage numbers above don't include the rules below. Each one depends on live game\nstate (like whether a character is attached to a unit) or isn't damage math at all, so a\npre-game estimate can't factor it in:"          
     unsupported_abilities_text += "\n\n**Your army**\n\n"  + get_unsupported_abilities_formatted(unsupported_abilities=my_army_unsupported)
     unsupported_abilities_text += "\n\n**Opponent's army**\n\n"  + get_unsupported_abilities_formatted(unsupported_abilities=enemy_army_unsupported)
+    title_block = build_title_block(my_army, enemy_army)
 
-    return resp + "\n\n" + unsupported_abilities_text
+    return title_block + "\n\n" + resp + "\n\n" + unsupported_abilities_text
+
+def get_attachement_bluffs_block(attachement_buffs: dict[str, dict[str, str]]):
+    if not attachement_buffs:
+        return ""
+
+    response = "ATTACHMENT BUFFS (already included in the defensive numbers below — credit these):\n"
+    response += get_attachment_buffs_formatted(attachement_buffs=attachement_buffs)
+
+    return response
 
 def offensive_assignment_block(offensive_assignment: dict[str, tuple], attacker_lookup_label: dict[str,str], defender_lookup_label: dict[str,str], dropped_units: list[str]) -> str:
     format_block: str = "OFFENSIVE ASSIGNMENT (your optimal offense — use these exact targets and phases):\n"
@@ -222,6 +254,15 @@ def offensive_assignment_block(offensive_assignment: dict[str, tuple], attacker_
         format_block += f"- {attacker_lookup_label[entry]} -> no worthwhile targets\n"
     return format_block
 
+def build_title_block(my_army, enemy_army) -> str:
+    my_faction    = my_army.faction_id.replace('-', ' ').title()
+    enemy_faction = enemy_army.faction_id.replace('-', ' ').title()
+    return (
+        f"# {my_faction} vs {enemy_faction}\n\n"
+        f"**Your army:** {my_faction} points ({sum(u.points for u in my_army.units)})\n\n"
+        f"**Opponent:** {enemy_faction} points ({sum(u.points for u in enemy_army.units)}\n"
+    )
+
 if __name__ == "__main__":
 
     from tabletop_tactician.paths import MY_ARMY, ENEMY_ARMY
@@ -230,7 +271,7 @@ if __name__ == "__main__":
     enemy_army = load(path=ENEMY_ARMY)
 
     question = "How do I play my army against the enemy army — where do I hit hardest, and how well does my army hold up?"
-
+         
     battle_report = build_full_report(my_army=my_army, enemy_army=enemy_army, prompt=question)
     print( battle_report)
 

@@ -35,6 +35,11 @@ def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction
 
 
 # --- a roster unit's total damage in one phase (the roll-up, loadout-driven) ---
+# mortal-wound abilities are deliberately NOT added to the damage here. The data
+# doesn't tell us how often each one can be used or what sets it off, so any number
+# we added would assume it goes off every turn against anything — overstating the
+# attacker. We flag them in "Not Accounted For" instead and let the player judge.
+
 def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, defender_faction_id: str, phase: str) -> float:
     """attacker_unit / target_unit are type FieldedUnit: {id, model_count, wargear}."""
     target = unit_raw(target_unit.id)
