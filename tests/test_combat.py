@@ -1,6 +1,6 @@
 import pytest
 from tabletop_tactician.models.profiles import WeaponType
-from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw, wound_pool
+from tabletop_tactician.reference_data.reference import weapon_raw, unit_raw, wound_pool, describe_buff, merge_leaders_with_units
 from tabletop_tactician.combat_mechanics.damage import weapon_damage, unit_damage, pistol_damage
 from tabletop_tactician.reference_data.roster import Army
 from tabletop_tactician.combat_mechanics.threat_matrix import build_combat_matchups, unique_labels
@@ -90,3 +90,33 @@ def test_pistol_damage_allocation():
     assert pistol_damage([(bolt, 8), (plasma, 1)], 3) == plasma + 2 * bolt
     # nothing fires
     assert pistol_damage([(plasma, 4)], 0) == 0.0
+
+
+@pytest.mark.parametrize("buff, expected", [
+    ({'type': 'feel-no-pain', 'threshold': 5},'Feel No Pain 5+') ,
+    ({'type': 'invulnerable-save', 'threshold': 2},  'Invulnerable Save 2+'),
+    ({'type': 'hit-mod', 'value': -1}, '-1 to be hit') , 
+    ({'type': 'toughness-mod', 'value': 1},  '+1 Toughness'),  
+    ({'type': 'damage-reduction', 'value': 1}, 'Damage -1'),
+    ({'type': 'wound-mod', 'value': -1},'-1 to be wounded'),
+    ({'type': 'some-future-threshold-thing', 'threshold': 3}, 'Some Future Threshold Thing'),
+])
+def test_describe_buff(buff, expected):
+    assert describe_buff(buff) == expected
+
+def test_merge_leaders_with_unit():
+    boyz = FieldedUnit(id="boyz", name="Boyz", model_count=10, wargear=[Wargear(id="choppa", count=20)],leaders=["painboy"],points=150, wounds=21,
+                           composition=[UnitComposition("Boss Nob", 1), UnitComposition("Boy", 19)])
+    painboy= FieldedUnit(id="painboy", name="Painboy", model_count=1, wargear=[Wargear(id="power-klaw", count=1)],points=80, wounds=3,
+                           composition=[UnitComposition("Painboy", 1)],leader_attachment={"bodyguard_ref": {"raw_name": "Boyz"},"role": "leader","provisional": False})
+
+    army = Army(faction_id="Orks", units=[boyz, painboy])
+    merged = merge_leaders_with_units(army=army)
+    unit = merged.units[0]
+    #check that there is only one unit after the merge
+    assert len(merged.units) == 1
+    assert unit.leaders[0] == 'painboy'
+    assert unit.name == "Boyz with ( Painboy )"
+    assert unit.points == boyz.points + painboy.points
+    assert unit.wounds == boyz.wounds + painboy.wounds
+    assert unit.wargear == [Wargear(id="choppa", count=20), Wargear(id="power-klaw", count=1)]
