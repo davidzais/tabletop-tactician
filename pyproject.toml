@@ -21,4 +21,10 @@ packages = ["src/tabletop_tactician"]
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.16.0",
 ]
+
+[tool.ruff]
+# Line width before Ruff wraps. 88 is the tool default; 100-120 are common
+# team choices. Signatures or calls longer than this wrap one item per line.
+line-length = 120
