@@ -4,7 +4,7 @@ from tabletop_tactician.reference_data.roster import Army
 from tabletop_tactician.reference_data.reference import get_unsupported_abilities, merge_leaders_with_units, get_attachement_buffs
 from tabletop_tactician.agent.tools import GET_THREAT_MATRIX_TOOL, get_threat_matrix, load
 from tabletop_tactician.models.profiles import WeaponType
-from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup
+from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup, build_threat_overview
 import json
 import sys
 
@@ -67,6 +67,26 @@ figures. The only judgment you MAY add: if a cheap-but-critical enemy unit (a ps
 left alone by this value-based plan, flag it in the relevant unit's "Why it matters" line — but never change
 an assigned Best target.
 
+ATTACHMENT BUFFS (supplied with the question): a list of defensive buffs that an attached leader gives the
+unit it has joined (for example a Painboy granting Feel No Pain to a mob of Boyz). These buffs are ALREADY
+baked into the defensive damage numbers you get from the data — the unit is already tougher because of them.
+Use this list in the Defensive Section: when a listed unit is harder to kill than its bare stats suggest, name
+the buff and the leader providing it so the player understands WHY (e.g. "the 5+ Feel No Pain from the Painboy
+is already keeping this number down"). Do NOT tell the player to add or seek these buffs — the unit already has
+them — and do NOT lower the damage figures yourself to account for them, because they are already counted. If a
+unit is not in this list, it has no attachment buff; say nothing about buffs for it.
+
+THREATS TO YOU (supplied with the question): a list of the enemy's units ranked by their overall menace to
+your army, worst first. Each unit is tagged [in plan] or [NOT IN PLAN] and shows two numbers. "overall threat"
+is a RELATIVE ranking score of how much of your whole army a unit endangers across the game — it is NOT a
+points total and NOT a single-turn figure, so never quote it as points destroyed; use it only to judge how
+high a threat ranks. "worst single hit" IS a real per-target figure: the expected value it destroys against
+the one unit of yours it hurts most, which is named alongside it — you may cite this. [NOT IN PLAN] means your
+OFFENSIVE ASSIGNMENT sends no unit to deal with that enemy unit, because the value-based plan ranks by points
+and can leave a dangerous unit uncovered. For every unit marked [NOT IN PLAN] that ranks as a serious threat
+you MUST address it in the "Threats Your Plan Doesn't Cover" section below — do not silently ignore it. This
+does NOT change the OFFENSIVE ASSIGNMENT; it is a tactical recommendation layered on top.
+
 PLAYER LANGUAGE: fraction_destroyed is an internal 0.0-1.0 value — never show it as a decimal ("1.0
 fraction" means nothing to a player). Express it instead as roughly what PERCENTAGE of the target unit is
 destroyed: 1.0 -> "destroys 100% of the unit", 0.6 -> "destroys about 60% of the unit", 0.1 -> "barely
@@ -105,6 +125,14 @@ beneath:
   describe in plain terms how badly it hurts this unit (per PLAYER LANGUAGE), then the STAT LINE.
 - Why it matters: one comparative, actionable line — how exposed this unit is and how to protect it.
 
+## Threats Your Plan Doesn't Cover
+If every serious threat is marked [in plan], write a single line saying your plan already answers the enemy's
+biggest threats, and move on. Otherwise, for each [NOT IN PLAN] unit high on the THREATS TO YOU list: name it,
+say in plain terms how dangerous it is and which of your units it hurts most, and give ONE actionable
+recommendation — either which of your units to redirect onto it and what that unit would stop doing, or why
+it's acceptable to leave it this turn (it's slow, you can screen it, etc.). Judge "serious" by where it ranks
+in the list, not by treating its overall-threat number as points.
+
 ## Bottom Line
 2-3 sentences: which of your units to commit and against what, which enemy units to eliminate first, and what to protect.
 
@@ -118,12 +146,13 @@ def get_client() -> OpenAI:
 
 
 
-def analyze(my_army: Army, enemy_army: Army, question: str, assignment_block: str, attachment_buffs_block: str):
+def analyze(my_army: Army, enemy_army: Army, question: str, assignment_block: str, attachment_buffs_block: str, threat_block: str):
     client = get_client()
     
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": question + "\n\n" + assignment_block  + "\n\n" + attachment_buffs_block}
+        {"role": "user", "content": question + "\n\n" + assignment_block + "\n\n" + attachment_buffs_block + "\n\n" + threat_block}
+
     ]
     
     # avoid an accidental infinite loop if something breaks
@@ -215,6 +244,8 @@ def deep_merge(dict1, dict2) -> dict:
             dict1[key] = value
     return dict1
 
+
+
 def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:   
     attacker_label_lookup = build_name_lookup(merge_leaders_with_units(my_army))
     defender_label_lookup = build_name_lookup(merge_leaders_with_units(enemy_army))
@@ -224,7 +255,14 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
 
     attatchment_buffs = get_attachment_buffs_for_army(my_army)
     buff_block = get_attachement_bluffs_block( attatchment_buffs )
-    resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt, assignment_block=assignment_block, attachment_buffs_block=buff_block)
+
+    covered = {target for (target, phase, value) in offensive_assignment.values()}   
+    rows = build_threat_overview(my_army, enemy_army, covered_enemy_labels=covered, enemy_name_lookup=defender_label_lookup)
+    threat_block = format_threat_block(rows)
+
+
+
+    resp = analyze(my_army=my_army,enemy_army=enemy_army, question=prompt, assignment_block=assignment_block, attachment_buffs_block=buff_block, threat_block=threat_block)
 
     my_army_unsupported = get_unsupported_abilities_for_army(army=my_army) 
     enemy_army_unsupported = get_unsupported_abilities_for_army(army=enemy_army) 
@@ -245,6 +283,14 @@ def get_attachement_bluffs_block(attachement_buffs: dict[str, dict[str, str]]):
 
     return response
 
+def format_threat_block(rows) -> str:
+    text = "THREATS TO YOU (ranked by overall menace to your whole army, worst first):\n"
+    for name, threat, covered in rows:
+        tag = "in plan" if covered else "NOT IN PLAN"
+        text += f"- {name} [{tag}]: overall threat ~{threat["rank_value"]:.0f}; worst single hit ~{threat["value_destroyed"]:.0f} on your {threat["target"]}\n"
+
+    return text
+
 def offensive_assignment_block(offensive_assignment: dict[str, tuple], attacker_lookup_label: dict[str,str], defender_lookup_label: dict[str,str], dropped_units: list[str]) -> str:
     format_block: str = "OFFENSIVE ASSIGNMENT (your optimal offense — use these exact targets and phases):\n"
     for key, value in offensive_assignment.items():
@@ -260,7 +306,7 @@ def build_title_block(my_army, enemy_army) -> str:
     return (
         f"# {my_faction} vs {enemy_faction}\n\n"
         f"**Your army:** {my_faction} points ({sum(u.points for u in my_army.units)})\n\n"
-        f"**Opponent:** {enemy_faction} points ({sum(u.points for u in enemy_army.units)}\n"
+        f"**Opponent:** {enemy_faction} points ({sum(u.points for u in enemy_army.units)})\n"
     )
 
 if __name__ == "__main__":

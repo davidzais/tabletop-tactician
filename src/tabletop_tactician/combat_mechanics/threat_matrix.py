@@ -1,7 +1,7 @@
 from tabletop_tactician.models.profiles import  WeaponType, CombatMatchup
 from tabletop_tactician.combat_mechanics.damage import unit_damage
 from tabletop_tactician.reference_data.roster import Army, FieldedUnit,  load_roster
-from tabletop_tactician.reference_data.reference import wound_pool, merge_leaders_with_units
+from tabletop_tactician.reference_data.reference import merge_leaders_with_units
 from collections import Counter, defaultdict
 from scipy.optimize import linear_sum_assignment
 
@@ -23,6 +23,34 @@ def build_combat_matchups(attacking_army: Army, defending_army: Army) -> list[Co
                current_matchup = CombatMatchup(attacker=a_label, defender=d_label, combat_phase=phase, damage=damage, wound_pool=defender.wounds, defender_points=defender.points)
                combat_matchups.append(current_matchup)
     return combat_matchups
+
+def build_threat_overview(my_army: Army, enemy_army: Army, covered_enemy_labels: dict[str,str], enemy_name_lookup: dict[str,str]):
+    reverse: list[CombatMatchup] = build_combat_matchups(attacking_army=enemy_army, defending_army=my_army)   
+    best = process_best_phase_matchup(matchups=reverse)
+
+    # collapse to each enemy unit's BEST value and sum against any one of your units for the ranking
+    # use the value_destroyed for the actual threat.
+    threat_by_enemy = defaultdict(lambda: {"rank_value": 0.0, "value_destroyed": 0.0, "target" : ""})  
+    
+    for (enemy_label, my_label), (phase, value) in best.items():
+        threat_by_enemy[enemy_label]["rank_value"] = threat_by_enemy[enemy_label]["rank_value"] + value
+        if value > threat_by_enemy[enemy_label]["value_destroyed"]:
+            threat_by_enemy[enemy_label]["value_destroyed"] = value
+            threat_by_enemy[enemy_label]["target"] = my_label.replace("-", " ").title()
+  
+    rows = []
+    rows_sorted = sorted(threat_by_enemy.items(), key=threat_value, reverse=True)
+    for enemy_label, threat in rows_sorted:
+        rows.append((enemy_name_lookup[enemy_label], threat, enemy_label in covered_enemy_labels))
+ 
+    return rows      
+
+def threat_value(threat_dict: dict[str, dict[str, float]]):
+    key, vals = threat_dict
+    
+    threat = vals["rank_value"]      
+    return threat
+
 
 
 def process_best_phase_matchup(matchups: list[CombatMatchup]):
