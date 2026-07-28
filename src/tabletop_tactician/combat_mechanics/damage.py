@@ -10,25 +10,34 @@ from tabletop_tactician.reference_data.roster import FieldedUnit
 from tabletop_tactician.reference_data.reference import unit_raw, weapon_raw, get_dataset, get_converted_phase
 
 
-
 # --- one weapon's damage stage ---
-def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction_id: str, phase: str, models_firing: int, target_unit_leaders: list[str]) -> float:
+def weapon_damage(
+    weapon_raw_dict: dict,
+    target_raw_dict: dict,
+    defender_faction_id: str,
+    phase: str,
+    models_firing: int,
+    target_unit_leaders: list[str],
+) -> float:
 
     # this conversion is neccessary for the defensive_buffs_for(), we use ranged/melee
     # but internally api uses shooting/fight
     converted_phase = get_converted_phase(phase=phase)
-    unit_input = {"unitId": target_raw_dict["id"], "factionId": defender_faction_id, "attachedUnitIds": target_unit_leaders}
+    unit_input = {
+        "unitId": target_raw_dict["id"],
+        "factionId": defender_faction_id,
+        "attachedUnitIds": target_unit_leaders,
+    }
     phase_context = {"phase": converted_phase}
 
     dataset = get_dataset()
     result = crunch(
-
         {
             "attacker": {"weapon": weapon_raw_dict, "profileIndex": 0},
             "target": {"unit": target_raw_dict, "profileIndex": 0},
             "modelsFiring": models_firing,
             "buffs": dataset.defensive_buffs_for(input=unit_input, context=phase_context),
-            "context": {}            
+            "context": {},
         }
     )
     return next(s for s in result["stages"] if s["name"] == "after-fnp")["expected"]
@@ -40,7 +49,10 @@ def weapon_damage(weapon_raw_dict: dict, target_raw_dict: dict, defender_faction
 # we added would assume it goes off every turn against anything — overstating the
 # attacker. We flag them in "Not Accounted For" instead and let the player judge.
 
-def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, defender_faction_id: str, phase: str) -> float:
+
+def unit_damage(
+    attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, defender_faction_id: str, phase: str
+) -> float:
     """attacker_unit / target_unit are type FieldedUnit: {id, model_count, wargear}."""
     target = unit_raw(target_unit.id)
     total = 0.0
@@ -50,7 +62,14 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
             if wr is not None:
                 if wr["type"] != phase:  # phase filter, off the weapon's own type
                     continue
-                total += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count, target_unit_leaders=target_unit.leaders)  # count = models firing THIS weapon
+                total += weapon_damage(
+                    weapon_raw_dict=wr,
+                    target_raw_dict=target,
+                    defender_faction_id=defender_faction_id,
+                    phase=phase,
+                    models_firing=wg.count,
+                    target_unit_leaders=target_unit.leaders,
+                )  # count = models firing THIS weapon
         return total
     else:
         pistol_count = 0
@@ -76,14 +95,28 @@ def unit_damage(attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_f
                     pistol_holder.append((wr, wg.count))
                 else:
                     non_pistol_count += wg.count
-                    total_non_pistol_damage_count += weapon_damage(weapon_raw_dict=wr, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase, models_firing=wg.count, target_unit_leaders=target_unit.leaders) 
+                    total_non_pistol_damage_count += weapon_damage(
+                        weapon_raw_dict=wr,
+                        target_raw_dict=target,
+                        defender_faction_id=defender_faction_id,
+                        phase=phase,
+                        models_firing=wg.count,
+                        target_unit_leaders=target_unit.leaders,
+                    )
 
-        pistols_that_fire = max(0, pistol_count - non_pistol_count)       
-        #lets rank the pistols so we can fire the best ones first, if the unit has more than one
-        shot_damages = pistol_shot_damage(pistol_holder=pistol_holder, target_raw_dict=target, defender_faction_id=defender_faction_id, phase=phase,  target_unit_leaders=target_unit.leaders)
-        total_pistol_damage = pistol_damage(shot_damages, pistols_that_fire)       
+        pistols_that_fire = max(0, pistol_count - non_pistol_count)
+        # lets rank the pistols so we can fire the best ones first, if the unit has more than one
+        shot_damages = pistol_shot_damage(
+            pistol_holder=pistol_holder,
+            target_raw_dict=target,
+            defender_faction_id=defender_faction_id,
+            phase=phase,
+            target_unit_leaders=target_unit.leaders,
+        )
+        total_pistol_damage = pistol_damage(shot_damages, pistols_that_fire)
 
     return total_non_pistol_damage_count + total_pistol_damage
+
 
 # spend the pistol allotment on the hardest-hitting pistols first
 def pistol_damage(pistols: list[tuple[float, int]], pistols_that_fire: int) -> float:
@@ -91,7 +124,7 @@ def pistol_damage(pistols: list[tuple[float, int]], pistols_that_fire: int) -> f
     Fires the best pistols first, up to pistols_that_fire, and sums the damage."""
     total = 0.0
     remaining = pistols_that_fire
-    for per_shot, count in sorted(pistols, reverse=True):   # best pistol first
+    for per_shot, count in sorted(pistols, reverse=True):  # best pistol first
         if remaining <= 0:
             break
         firing = min(count, remaining)
@@ -100,15 +133,27 @@ def pistol_damage(pistols: list[tuple[float, int]], pistols_that_fire: int) -> f
     return total
 
 
-
-#since a unit might have Multiple pistol types, we want to fire the one that hits the hardest
-def pistol_shot_damage(pistol_holder: list[tuple], target_raw_dict: dict, defender_faction_id: str, phase: str, target_unit_leaders: list[str]):
+# since a unit might have Multiple pistol types, we want to fire the one that hits the hardest
+def pistol_shot_damage(
+    pistol_holder: list[tuple],
+    target_raw_dict: dict,
+    defender_faction_id: str,
+    phase: str,
+    target_unit_leaders: list[str],
+):
     pistol_weapons = []
-    for (wr, count) in pistol_holder:
-        per_shot = weapon_damage(weapon_raw_dict=wr, target_raw_dict=target_raw_dict, defender_faction_id=defender_faction_id, phase=phase, models_firing=1, target_unit_leaders=target_unit_leaders) 
-        pistol_weapons.append( (per_shot, count) )
-    
-    return pistol_weapons 
+    for wr, count in pistol_holder:
+        per_shot = weapon_damage(
+            weapon_raw_dict=wr,
+            target_raw_dict=target_raw_dict,
+            defender_faction_id=defender_faction_id,
+            phase=phase,
+            models_firing=1,
+            target_unit_leaders=target_unit_leaders,
+        )
+        pistol_weapons.append((per_shot, count))
+
+    return pistol_weapons
 
 
 def is_pistol(weapon: dict) -> bool:
