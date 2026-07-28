@@ -7,6 +7,7 @@ from tabletop_tactician.models.profiles import WeaponType
 from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup, build_threat_overview
 import json
 import sys
+from itertools import zip_longest
 
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -223,7 +224,7 @@ def get_unsupported_abilities_formatted(unsupported_abilities: dict[str, dict[st
         response += "\n"
 
     return response          
-def get_attachment_buffs_formatted(attachement_buffs: dict[str, dict[str, str]]):
+def get_attachment_buffs_formatted(attachement_buffs: dict[str, dict[str, str]]) -> str:
     response: str = ""
     for key, buff in attachement_buffs.items():
         unit = key 
@@ -274,7 +275,7 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
 
     return title_block + "\n\n" + resp + "\n\n" + unsupported_abilities_text
 
-def get_attachement_bluffs_block(attachement_buffs: dict[str, dict[str, str]]):
+def get_attachement_bluffs_block(attachement_buffs: dict[str, dict[str, str]]) -> str:
     if not attachement_buffs:
         return ""
 
@@ -300,25 +301,30 @@ def offensive_assignment_block(offensive_assignment: dict[str, tuple], attacker_
         format_block += f"- {attacker_lookup_label[entry]} -> no worthwhile targets\n"
     return format_block
 
-def build_title_block(my_army, enemy_army) -> str:
+def build_title_block(my_army: Army, enemy_army: Army) -> str:
     my_faction    = my_army.faction_id.replace('-', ' ').title()
     enemy_faction = enemy_army.faction_id.replace('-', ' ').title()
-    return (
-        f"# {my_faction} vs {enemy_faction}\n\n"
-        f"**Your army:** {my_faction} points ({sum(u.points for u in my_army.units)})\n\n"
-        f"**Opponent:** {enemy_faction} points ({sum(u.points for u in enemy_army.units)})\n"
-    )
+    roster_table = build_roster_table(my_army, my_faction, enemy_army, enemy_faction)
+    return f"# {my_faction} vs {enemy_faction}\n\n{roster_table}"
+       
+def build_roster_table(my_army: Army, my_faction: str, enemy_army: Army, enemy_faction: str) -> str:
+    my_names    = [u.name for u in merge_leaders_with_units(my_army).units]
+    enemy_names = [u.name for u in merge_leaders_with_units(enemy_army).units]
+    header = f"|**Your army:** {my_faction} points ({sum(u.points for u in my_army.units)}) | **Opponent:** {enemy_faction} points ({sum(u.points for u in enemy_army.units)}) |"
+    divider  = "| --- | --- |"
+    rows = []
+    for mine, theirs in zip_longest(my_names, enemy_names, fillvalue=""):        
+        rows.append(f"| {mine} | {theirs} |")
+
+    return header + "\n" + divider + "\n" + "\n".join(rows)
 
 if __name__ == "__main__":
 
     from tabletop_tactician.paths import MY_ARMY, ENEMY_ARMY
 
     my_army = load(path=MY_ARMY)
-    enemy_army = load(path=ENEMY_ARMY)
-
+    enemy_army = load(path=ENEMY_ARMY)   
     question = "How do I play my army against the enemy army — where do I hit hardest, and how well does my army hold up?"
          
     battle_report = build_full_report(my_army=my_army, enemy_army=enemy_army, prompt=question)
-    print( battle_report)
-
-    
+    print(battle_report)   
