@@ -118,5 +118,5 @@ def test_merge_leaders_with_unit():
     assert unit.leaders[0] == 'painboy'
     assert unit.name == "Boyz with ( Painboy )"
     assert unit.points == boyz.points + painboy.points
-    assert unit.wounds == boyz.wounds + painboy.wounds
+    assert unit.wounds == wound_pool(boyz) + wound_pool(painboy)
     assert unit.wargear == [Wargear(id="choppa", count=20), Wargear(id="power-klaw", count=1)]
