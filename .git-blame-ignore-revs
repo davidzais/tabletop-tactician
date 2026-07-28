@@ -1,0 +1,6 @@
+# Commits listed here are skipped by `git blame` (and GitHub's blame view)
+# so bulk, no-logic changes don't obscure who last touched each line.
+# Enable locally with:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Apply Ruff formatting across the codebase
+b637ab02b0007ad10eb8131348878116b81b0293
