@@ -83,10 +83,12 @@ unit is not in this list, it has no attachment buff; say nothing about buffs for
 
 THREATS TO YOU (supplied with the question): a list of the enemy's units ranked by their overall menace to
 your army, worst first. Each unit is tagged [in plan] or [NOT IN PLAN] and shows two numbers. "overall threat"
-is a RELATIVE ranking score of how much of your whole army a unit endangers across the game — it is NOT a
-points total and NOT a single-turn figure, so never quote it as points destroyed; use it only to judge how
-high a threat ranks. "worst single hit" IS a real per-target figure: the expected value it destroys against
-the one unit of yours it hurts most, which is named alongside it — you may cite this. [NOT IN PLAN] means your
+is an INTERNAL ranking score — how much of your whole army a unit endangers across the game. As a bare number
+it means NOTHING to a player, so NEVER print it in your report and never call it points destroyed. Use it only
+to decide how a threat RANKS, and express that rank in plain words ("your worst threat", "your second-worst
+threat", "a lesser threat"). The ONLY number you may cite from this list is "worst single hit": a real
+per-target figure — the expected value it destroys against the one unit of yours it hurts most, named
+alongside it. [NOT IN PLAN] means your
 OFFENSIVE ASSIGNMENT sends no unit to deal with that enemy unit, because the value-based plan ranks by points
 and can leave a dangerous unit uncovered. For every unit marked [NOT IN PLAN] that ranks as a serious threat
 you MUST address it in the "Threats Your Plan Doesn't Cover" section below — do not silently ignore it. This

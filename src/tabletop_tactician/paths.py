@@ -18,7 +18,7 @@ from pathlib import Path
 ROSTERS_DIR = Path(__file__).parent.parent.parent / "rosters"
 
 #: The army the reports are written FOR.
-MY_ARMY = ROSTERS_DIR / "orks_armageddon_attached.json"
+MY_ARMY = ROSTERS_DIR / "orks_armageddon.txt"
 
 #: The army it is up against.
-ENEMY_ARMY = ROSTERS_DIR / "sm_armageddon_attached.json"
+ENEMY_ARMY = ROSTERS_DIR / "sm_armageddon.txt"
