@@ -1,18 +1,19 @@
-from openai import OpenAI
-from tabletop_tactician.config import get_settings
-from tabletop_tactician.reference_data.roster import Army
-from tabletop_tactician.reference_data.reference import (
-    get_unsupported_abilities,
-    merge_leaders_with_units,
-    get_attachement_buffs,
-)
-from tabletop_tactician.agent.tools import GET_THREAT_MATRIX_TOOL, get_threat_matrix, load
-from tabletop_tactician.models.profiles import WeaponType
-from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup, build_threat_overview
 import json
 import sys
 from itertools import zip_longest
 
+from openai import OpenAI
+
+from tabletop_tactician.agent.tools import GET_THREAT_MATRIX_TOOL, get_threat_matrix, load
+from tabletop_tactician.combat_mechanics.threat_matrix import assign_targets, build_name_lookup, build_threat_overview
+from tabletop_tactician.config import get_settings
+from tabletop_tactician.models.profiles import WeaponType
+from tabletop_tactician.reference_data.reference import (
+    get_attachement_buffs,
+    get_unsupported_abilities,
+    merge_leaders_with_units,
+)
+from tabletop_tactician.reference_data.roster import Army
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -72,7 +73,7 @@ figures. The only judgment you MAY add: if a cheap-but-critical enemy unit (a ps
 left alone by this value-based plan, flag it in the relevant unit's "Why it matters" line — but never change
 an assigned Best target.
 
-ATTACHMENT BUFFS (supplied with the question): a list of defensive buffs that an attached leader gives the
+DEFENSIVE ATTACHMENT BUFFS (supplied with the question): a list of defensive buffs that an attached leader gives the
 unit it has joined (for example a Painboy granting Feel No Pain to a mob of Boyz). These buffs are ALREADY
 baked into the defensive damage numbers you get from the data — the unit is already tougher because of them.
 Use this list in the Defensive Section: when a listed unit is harder to kill than its bare stats suggest, name
@@ -80,6 +81,15 @@ the buff and the leader providing it so the player understands WHY (e.g. "the 5+
 is already keeping this number down"). Do NOT tell the player to add or seek these buffs — the unit already has
 them — and do NOT lower the damage figures yourself to account for them, because they are already counted. If a
 unit is not in this list, it has no attachment buff; say nothing about buffs for it.
+
+OFFENSIVE ATTACHMENT BUFFS (supplied with the question): a list of offensive buffs that an attached leader gives the
+unit it has joined (for example a Canoness letting a squad of Battle Sisters re-roll their hit rolls of 1). These buffs
+are ALREADY baked into the offensive damage numbers you get from the data — the unit already hits harder because of
+them. Use this list in the Offensive Section: when a listed unit deals more damage than its bare weapons suggest, name
+the buff and the leader providing it so the player understands WHY (e.g. "the Canoness's re-roll is already lifting this
+number"). Do NOT tell the player to attach a character to boost the unit — one is already attached and already counted
+— and do NOT raise the damage figures yourself to account for the buff, because it is already in the number. If a unit
+is not in this list, it has no offensive attachment buff; say nothing about buffs for it.
 
 THREATS TO YOU (supplied with the question): a list of the enemy's units ranked by their overall menace to
 your army, worst first. Each unit is tagged [in plan] or [NOT IN PLAN] and shows two numbers. "overall threat"
@@ -159,7 +169,8 @@ def analyze(
     enemy_army: Army,
     question: str,
     assignment_block: str,
-    attachment_buffs_block: str,
+    defensive_buffs_block: str,
+    offensive_buffs_block: str,
     threat_block: str,
 ):
     client = get_client()
@@ -168,7 +179,7 @@ def analyze(
         {"role": "system", "content": SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": question + "\n\n" + assignment_block + "\n\n" + attachment_buffs_block + "\n\n" + threat_block,
+            "content": question + "\n\n" + assignment_block + "\n\n" + defensive_buffs_block + "\n\n" + offensive_buffs_block +  "\n\n" + threat_block,
         },
     ]
 
@@ -216,9 +227,9 @@ def get_unsupported_abilities_for_army(army: Army) -> dict[str, dict[str, str]]:
     return deep_merge(my_army_unsupported_ranged, my_army_unsupported_melee)
 
 
-def get_attachment_buffs_for_army(army: Army) -> dict[str, dict[str, str]]:
-    my_army_buffs_ranged = get_attachement_buffs(army, WeaponType.RANGED)
-    my_army_buffs_melee = get_attachement_buffs(army, WeaponType.MELEE)
+def get_attachment_buffs_for_army(army: Army, side: str) -> dict[str, dict[str, str]]:
+    my_army_buffs_ranged = get_attachement_buffs(army, WeaponType.RANGED, side=side)
+    my_army_buffs_melee = get_attachement_buffs(army, phase=WeaponType.MELEE, side=side)
 
     return deep_merge(my_army_buffs_ranged, my_army_buffs_melee)
 
@@ -273,8 +284,11 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
         dropped_units=dropped_units,
     )
 
-    attatchment_buffs = get_attachment_buffs_for_army(my_army)
-    buff_block = get_attachement_bluffs_block(attatchment_buffs)
+    defensive_buffs  = get_attachment_buffs_for_army(my_army, side="defensive")
+    defensive_block  = get_defensive_buffs_block(defensive_buffs)   # existing
+    offensive_buffs  = get_attachment_buffs_for_army(my_army, side="offensive")
+    offensive_block  = get_offensive_buffs_block(offensive_buffs)      # new
+
 
     covered = {target for (target, phase, value) in offensive_assignment.values()}
     rows = build_threat_overview(
@@ -287,7 +301,8 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
         enemy_army=enemy_army,
         question=prompt,
         assignment_block=assignment_block,
-        attachment_buffs_block=buff_block,
+        defensive_buffs_block=defensive_block,
+        offensive_buffs_block=offensive_block,
         threat_block=threat_block,
     )
 
@@ -306,13 +321,21 @@ def build_full_report(my_army: Army, enemy_army: Army, prompt: str) -> str:
     return title_block + "\n\n" + resp + "\n\n" + unsupported_abilities_text
 
 
-def get_attachement_bluffs_block(attachement_buffs: dict[str, dict[str, str]]) -> str:
+def get_defensive_buffs_block(attachement_buffs: dict[str, dict[str, str]]) -> str:
     if not attachement_buffs:
         return ""
 
-    response = "ATTACHMENT BUFFS (already included in the defensive numbers below — credit these):\n"
+    response = "DEFENSIVE ATTACHMENT BUFFS (already included in the defensive numbers below — credit these):\n"
     response += get_attachment_buffs_formatted(attachement_buffs=attachement_buffs)
 
+    return response
+
+def get_offensive_buffs_block(buffs: dict[str, dict[str, str]]) -> str:
+    if not buffs:
+        return ""
+    response = ("OFFENSIVE ATTACHMENT BUFFS (already included in the damage numbers above — "
+                "credit these; the leader is already attached, so never tell the player to add one):\n")
+    response += get_attachment_buffs_formatted(buffs)
     return response
 
 

@@ -85,7 +85,7 @@ def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str, str
     return unit_ability_holder
 
 
-def get_attachement_buffs(army: Army, phase: str) -> dict[str, str]:
+def get_attachement_buffs(army: Army, phase: str, side: str) -> dict[str, str]:
     merged = merge_leaders_with_units(army)  # so squads carry their .leaders and merged names  
     result = {}
 
@@ -93,14 +93,14 @@ def get_attachement_buffs(army: Army, phase: str) -> dict[str, str]:
         if len(unit.leaders) == 0:  # nobody joined this squad -> nothing to credit
             continue
 
-        phase_buffs = unit.buffs.defensive
+        phase_buffs = unit.buffs.defensive if side == "defensive" else unit.buffs.offensive
         buffs = phase_buffs.shooting if phase == "ranged" else phase_buffs.fight
 
         leader_buffs = leader_buff_filter(buffs=buffs, leaders=unit.leaders)
 
         buffs_for_this_unit = {}
         for buff in leader_buffs:
-            label = describe_buff(contribution=buff["contribution"], side="defensive")
+            label = describe_buff(contribution=buff["contribution"], side=side)
             leader_id = buff["source"]["sourceUnitId"]
             pretty = leader_id.replace("-", " ").title()
             buffs_for_this_unit[label] = pretty        
