@@ -5,10 +5,9 @@ here (that's combat_mechanics/damage.py).
 """
 
 from functools import cache
-
 from wh40kdc import Dataset
-from tabletop_tactician.reference_data.roster import Army, FieldedUnit
-from dataclasses import dataclass, replace
+from tabletop_tactician.reference_data.roster import Army, FieldedUnit, PhaseBuffs, UnitBuffs
+from dataclasses import replace
 
 
 def get_converted_phase(phase: str) -> str:
@@ -87,27 +86,24 @@ def get_unsupported_abilities(army: Army, phase: str) -> dict[str, dict[str, str
 
 
 def get_attachement_buffs(army: Army, phase: str) -> dict[str, str]:
-    merged = merge_leaders_with_units(army)  # so squads carry their .leaders and merged names
-    dataset = get_dataset()
+    merged = merge_leaders_with_units(army)  # so squads carry their .leaders and merged names  
     result = {}
 
     for unit in merged.units:
         if len(unit.leaders) == 0:  # nobody joined this squad -> nothing to credit
             continue
 
-        buffs = dataset.defensive_buffs_for(
-            input={"unitId": unit.id, "factionId": army.faction_id, "attachedUnitIds": unit.leaders},
-            context={"phase": get_converted_phase(phase)},
-        )
+        phase_buffs = unit.buffs.defensive
+        buffs = phase_buffs.shooting if phase == "ranged" else phase_buffs.fight
+
+        leader_buffs = leader_buff_filter(buffs=buffs, leaders=unit.leaders)
 
         buffs_for_this_unit = {}
-        for buff in buffs:
+        for buff in leader_buffs:
+            label = describe_buff(contribution=buff["contribution"], side="defensive")
             leader_id = buff["source"]["sourceUnitId"]
-            # keep ONLY buffs that came from an attached leader (not the squad's own rules)
-            if leader_id in unit.leaders:
-                label = describe_buff(buff["contribution"])  # "Feel No Pain 5+"  (helper below)
-                pretty = leader_id.replace("-", " ").title()  # "painboy" -> "Painboy"
-                buffs_for_this_unit[label] = pretty
+            pretty = leader_id.replace("-", " ").title()
+            buffs_for_this_unit[label] = pretty        
 
         if buffs_for_this_unit:
             result[unit.name] = buffs_for_this_unit
@@ -115,36 +111,81 @@ def get_attachement_buffs(army: Army, phase: str) -> dict[str, str]:
     return result
 
 
-def describe_buff(contribution: dict[str, object]) -> str:
+#get the description for the buffs so we can pass this up to teh llm
+#side is either offensive or defensive. this is needed because they both have a hit-mod
+#and wound-mod type, and it has a differnt meaning depending on what side you are viewing it from i.e.
+#    from the defender's point of view — "-1 to be hit", "-1 to be wounded". 
+#    On the attacker's side the same type means the opposite: +1 to hit, +1 to wound
+def describe_buff(contribution: dict[str, object], side: str) -> str:
     # example of what the contribution contains
     # {'type': 'wound-mod', 'value': -1}
     # {'type': 'feel-no-pain', 'threshold': 6}
-    # ...
+    # ...   
     buff_type = contribution["type"]
     type_val = buff_type.replace("-", " ").title()
 
-    if "threshold" in contribution:
+    if "threshold" in contribution:  # noqa: SIM102
         # as of 7/25/26 these are the only ones that im aware of, that may change
         # in the future so guard against it in case there may at some point
         # that isnt a + modifier
         if buff_type in ("feel-no-pain", "invulnerable-save"):
             return f"{type_val} {contribution['threshold']}+"
-
-    if "value" in contribution:
+    elif "value" in contribution:
         val = contribution["value"]
         if buff_type == "hit-mod":
-            return f"{val:+d} to be hit"
+            return f"{val:+d} to be hit" if side == "defensive" else f"{val:+d} to hit"
         elif buff_type == "toughness-mod":
             return f"{val:+d} Toughness"
         elif buff_type == "damage-reduction":
             return f"Damage -{val}"
         elif buff_type == "wound-mod":
-            return f"{val:+d} to be wounded"
-        else:
-            return type_val
+            return f"{val:+d} to be wounded" if side == "defensive" else f"{val:+d} to wound"
+        elif buff_type == "attacks-mod":
+            return f"{val:+d} Attack"
+        elif buff_type == "strength-mod":
+            return f"{val:+d} Strength"
+        elif buff_type == "ap-mod":
+            return f"{val:+d} AP"       
+    elif buff_type == "extra-keyword":           
+        return _format_extra_keyword_helper(contribution=contribution)
+    elif "roll" in contribution:
+        return _format_reroll_helper(contribution=contribution)
+    else:
+        return type_val
 
     return type_val
 
+def _format_reroll_helper(contribution: dict)-> str:
+    buff_type = contribution["type"]
+    # this will be either of hit or wound
+    roll_type = contribution["roll"]
+    
+    #this will be one of ones/all/failed
+    if "subset" in contribution:
+        subset = contribution["subset"]        
+        if subset == "ones":
+            return f"Re-roll {roll_type} rolls of 1"
+        if subset == "all":
+            return f"Re-roll all {roll_type} rolls"
+        if subset == "failed":
+            return f"Re-roll failed {roll_type} rolls"
+        else:
+            return buff_type
+    else:
+        return buff_type
+
+def _format_extra_keyword_helper(contribution: dict)-> str:
+    ref = contribution["keywordRef"]
+    name = ref["keyword_id"].replace("-", " ").title()  
+    params = ref.get("parameters")
+
+    if not params:                                       # e.g. Devastating Wounds
+        return name
+    if "value" in params:                                # e.g. Sustained Hits 1
+        return f"{name} {params['value']}"
+    if "target_keyword" in params:                       # e.g. Anti-Psyker 4+
+        return f"Anti-{params['target_keyword']} {params['threshold']}+"
+    return name 
 
 def wound_pool(unit: FieldedUnit) -> int:
     profiles = {p["name"]: p["W"] for p in unit_raw(unit.id)["profiles"]}
@@ -175,22 +216,36 @@ def get_min_wound(profiles: dict[str, int]) -> int:
 
 
 def merge_leaders_with_units(army: Army) -> Army:
+    dataset = get_dataset()
     merged_units: list[FieldedUnit] = []
     for unit in army.units:
+        unit_input = {"unitId": unit.id, "factionId": army.faction_id, "attachedUnitIds": unit.leaders}
+
+        defensive = PhaseBuffs(
+            shooting = dataset.defensive_buffs_for(unit_input, {"phase": "shooting"}),
+            fight    = dataset.defensive_buffs_for(unit_input, {"phase": "fight"}),
+        )
+        
+        
+
         if unit.leader_attachment is not None:
             # this unit joined a squad, so it's no longer a unit of its own
             continue
 
         if not unit.leaders:
             # nobody joined this unit — pass it through, just filling in its wounds
-            merged_units.append(replace(unit, wounds=wound_pool(unit)))
+            merged_units.append(replace(unit, wounds=wound_pool(unit), buffs=UnitBuffs(defensive, offensive=PhaseBuffs())))
             continue
 
         # someone joined this squad. gather the squad and its leaders into one list —
         # "the pieces of the combined unit" — then every total is a sum over the pieces.
         leaders = [get_unit_by_id(unit_id=leader_id, units=army.units) for leader_id in unit.leaders]
+        offensive = PhaseBuffs(
+                    shooting = leader_buff_filter(buffs=dataset.buffs_for(input=unit_input, context={"phase": "shooting"}), leaders=unit.leaders),
+                    fight    = leader_buff_filter(buffs=dataset.buffs_for(input=unit_input, context={"phase": "fight"}), leaders=unit.leaders),
+                )
         parts = [unit] + leaders
-
+        
         # gather every part's weapons and models into two flat lists
         all_wargear = []
         all_composition = []
@@ -209,6 +264,7 @@ def merge_leaders_with_units(army: Army) -> Army:
             composition=all_composition,
             leader_attachment=unit.leader_attachment,
             leaders=unit.leaders,
+            buffs=UnitBuffs(defensive, offensive)
         )
         merged_units.append(merged_unit)
 
@@ -219,6 +275,16 @@ def get_unit_by_id(unit_id: str, units: list[FieldedUnit]) -> FieldedUnit:
     target = [unit for unit in units if unit.id == unit_id]
     return target[0]
 
+def leader_buff_filter( buffs: list[dict[str, Any]], leaders: list[str]):
+    # keeps only the buffs whose source is one
+    # of the leaders — dropping the squad's own abilities and its weapon keywords (which
+    # crunch already handles)
+    filtered_buffs: list = []
+    for buff in buffs:
+        if buff.get("source", {}).get("sourceUnitId") in leaders:
+            filtered_buffs.append(buff)
+
+    return filtered_buffs
 
 @cache
 def get_dataset() -> Dataset:
