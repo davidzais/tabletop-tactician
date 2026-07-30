@@ -23,6 +23,16 @@ class UnitComposition:
     model: str
     count: int
 
+@dataclass
+class PhaseBuffs:
+    shooting: list = field(default_factory=list)
+    fight:    list = field(default_factory=list)
+
+@dataclass
+class UnitBuffs:
+    defensive: PhaseBuffs                 
+    offensive: PhaseBuffs                 
+
 
 @dataclass
 class FieldedUnit:
@@ -35,6 +45,7 @@ class FieldedUnit:
     composition: list[UnitComposition] = field(default_factory=list)
     leader_attachment: dict | None = None
     leaders: list = field(default_factory=list)
+    buffs: UnitBuffs | None = None        # empty on a freshly-imported unit; filled by merge
 
 
 @dataclass

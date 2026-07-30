@@ -6,37 +6,25 @@ Built on wh40kdc.crunch for the per-weapon math, plus our loadout-level rules
 
 from wh40kdc import crunch
 
+from tabletop_tactician.reference_data.reference import unit_raw, weapon_raw
 from tabletop_tactician.reference_data.roster import FieldedUnit
-from tabletop_tactician.reference_data.reference import unit_raw, weapon_raw, get_dataset, get_converted_phase
 
 
 # --- one weapon's damage stage ---
 def weapon_damage(
     weapon_raw_dict: dict,
-    target_raw_dict: dict,
-    defender_faction_id: str,
-    phase: str,
-    models_firing: int,
-    target_unit_leaders: list[str],
+    target_raw_dict: dict,   
+    models_firing: int,    
+    merged_buffs: list
 ) -> float:
-
-    # this conversion is neccessary for the defensive_buffs_for(), we use ranged/melee
-    # but internally api uses shooting/fight
-    converted_phase = get_converted_phase(phase=phase)
-    unit_input = {
-        "unitId": target_raw_dict["id"],
-        "factionId": defender_faction_id,
-        "attachedUnitIds": target_unit_leaders,
-    }
-    phase_context = {"phase": converted_phase}
-
-    dataset = get_dataset()
+    
     result = crunch(
         {
             "attacker": {"weapon": weapon_raw_dict, "profileIndex": 0},
             "target": {"unit": target_raw_dict, "profileIndex": 0},
             "modelsFiring": models_firing,
-            "buffs": dataset.defensive_buffs_for(input=unit_input, context=phase_context),
+            #"buffs": dataset.defensive_buffs_for(input=unit_input, context=phase_context),
+            "buffs": merged_buffs,
             "context": {},
         }
     )
@@ -51,11 +39,13 @@ def weapon_damage(
 
 
 def unit_damage(
-    attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, defender_faction_id: str, phase: str
+    attacker_unit: FieldedUnit, target_unit: FieldedUnit, attacker_faction_id: str, phase: str
 ) -> float:
     """attacker_unit / target_unit are type FieldedUnit: {id, model_count, wargear}."""
     target = unit_raw(target_unit.id)
     total = 0.0
+    merged_melee_buffs = attacker_unit.buffs.offensive.fight + target_unit.buffs.defensive.fight
+    merged_shooting_buffs = attacker_unit.buffs.offensive.shooting + target_unit.buffs.defensive.shooting
     if phase == "melee":
         for wg in attacker_unit.wargear:
             wr = weapon_raw(weapon_id=wg.id, faction_id=attacker_faction_id)
@@ -64,11 +54,9 @@ def unit_damage(
                     continue
                 total += weapon_damage(
                     weapon_raw_dict=wr,
-                    target_raw_dict=target,
-                    defender_faction_id=defender_faction_id,
-                    phase=phase,
-                    models_firing=wg.count,
-                    target_unit_leaders=target_unit.leaders,
+                    target_raw_dict=target,                    
+                    models_firing=wg.count,                
+                    merged_buffs=merged_melee_buffs
                 )  # count = models firing THIS weapon
         return total
     else:
@@ -77,6 +65,7 @@ def unit_damage(
         pistol_holder: list[dict] = []
         total_non_pistol_damage_count = 0.0
         total_pistol_damage = 0.0
+        
 
         # what we're doing here is we are making the assumption, that pistol would be the last resort for
         # a ranged weapon. If the unit has a bolt_rifle or other ranged weapon, you would opt to shoot that
@@ -97,21 +86,17 @@ def unit_damage(
                     non_pistol_count += wg.count
                     total_non_pistol_damage_count += weapon_damage(
                         weapon_raw_dict=wr,
-                        target_raw_dict=target,
-                        defender_faction_id=defender_faction_id,
-                        phase=phase,
-                        models_firing=wg.count,
-                        target_unit_leaders=target_unit.leaders,
+                        target_raw_dict=target,                       
+                        models_firing=wg.count,                        
+                        merged_buffs=merged_shooting_buffs
                     )
 
         pistols_that_fire = max(0, pistol_count - non_pistol_count)
         # lets rank the pistols so we can fire the best ones first, if the unit has more than one
         shot_damages = pistol_shot_damage(
             pistol_holder=pistol_holder,
-            target_raw_dict=target,
-            defender_faction_id=defender_faction_id,
-            phase=phase,
-            target_unit_leaders=target_unit.leaders,
+            target_raw_dict=target,            
+            merged_buffs = merged_shooting_buffs
         )
         total_pistol_damage = pistol_damage(shot_damages, pistols_that_fire)
 
@@ -136,20 +121,16 @@ def pistol_damage(pistols: list[tuple[float, int]], pistols_that_fire: int) -> f
 # since a unit might have Multiple pistol types, we want to fire the one that hits the hardest
 def pistol_shot_damage(
     pistol_holder: list[tuple],
-    target_raw_dict: dict,
-    defender_faction_id: str,
-    phase: str,
-    target_unit_leaders: list[str],
+    target_raw_dict: dict,    
+    merged_buffs: list
 ):
     pistol_weapons = []
     for wr, count in pistol_holder:
         per_shot = weapon_damage(
             weapon_raw_dict=wr,
-            target_raw_dict=target_raw_dict,
-            defender_faction_id=defender_faction_id,
-            phase=phase,
-            models_firing=1,
-            target_unit_leaders=target_unit_leaders,
+            target_raw_dict=target_raw_dict,            
+            models_firing=1,           
+            merged_buffs=merged_buffs
         )
         pistol_weapons.append((per_shot, count))
 

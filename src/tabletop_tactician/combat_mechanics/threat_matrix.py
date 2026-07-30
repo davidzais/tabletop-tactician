@@ -1,9 +1,11 @@
-from tabletop_tactician.models.profiles import WeaponType, CombatMatchup
-from tabletop_tactician.combat_mechanics.damage import unit_damage
-from tabletop_tactician.reference_data.roster import Army, FieldedUnit, load_roster
-from tabletop_tactician.reference_data.reference import merge_leaders_with_units
 from collections import Counter, defaultdict
+
 from scipy.optimize import linear_sum_assignment
+
+from tabletop_tactician.combat_mechanics.damage import unit_damage
+from tabletop_tactician.models.profiles import CombatMatchup, WeaponType
+from tabletop_tactician.reference_data.reference import merge_leaders_with_units
+from tabletop_tactician.reference_data.roster import Army, FieldedUnit, load_roster
 
 
 def build_combat_matchups(attacking_army: Army, defending_army: Army) -> list[CombatMatchup]:
@@ -22,8 +24,7 @@ def build_combat_matchups(attacking_army: Army, defending_army: Army) -> list[Co
                 damage = unit_damage(
                     attacker_unit=attacker,
                     target_unit=defender,
-                    attacker_faction_id=merged_attacker.faction_id,
-                    defender_faction_id=merged_defender.faction_id,
+                    attacker_faction_id=merged_attacker.faction_id,                    
                     phase=phase,
                 )
                 current_matchup = CombatMatchup(
