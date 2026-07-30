@@ -513,7 +513,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.45.0" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "scipy", specifier = ">=1.18.0" },
-    { name = "wh40kdc", specifier = ">=1.1.4" },
+    { name = "wh40kdc", specifier = ">=1.2.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -557,12 +557,12 @@ wheels = [
 
 [[package]]
 name = "wh40kdc"
-version = "1.1.4"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonschema" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fe/4a/9864b898749f3f1bd6b25de502fab57a37392374f9da2083c48a5fc41a3b/wh40kdc-1.1.4.tar.gz", hash = "sha256:07d79ad757759fe0ea47cab1d94cb97f63eb62be228298dfded9ee434e89a65d", size = 1003361, upload-time = "2026-07-22T14:12:42.791Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/26/e18337b63c0046cc92b7d91601b90a729cc33ce38febd2086ce219cdf12d/wh40kdc-1.2.1.tar.gz", hash = "sha256:55583eefe722475d87da5e94709e2fa3d25ae679b365d4adacce3718d4a5d9ca", size = 1007898, upload-time = "2026-07-29T18:57:31.609Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/b7/d13fc50064e85c950c8a5be1ddfdfadcd9c1dc4a9b763f43ef0c7819f337/wh40kdc-1.1.4-py3-none-any.whl", hash = "sha256:f2181ad87dfcb05b838d39459b19482bdded60d620600a444fe961314bb8c2de", size = 1080465, upload-time = "2026-07-22T14:12:41.205Z" },
+    { url = "https://files.pythonhosted.org/packages/11/df/fa88a898d2ad7afb94cb20abbac2ad4b109010e8a401efd4f9e90b66c6f3/wh40kdc-1.2.1-py3-none-any.whl", hash = "sha256:543cfd5b0db2b7c475aaee57b99dc039d230079a6d6b1a4906456a7763ed2ce5", size = 1084749, upload-time = "2026-07-29T18:57:30.051Z" },
 ]
