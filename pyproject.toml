@@ -5,10 +5,13 @@ description = "An agentic Warhammer 40,000 matchup adviser: deterministic combat
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "clerk-backend-api>=6.0.1",
     "fastapi[standard]>=0.141.1",
     "openai>=2.45.0",
     "pydantic-settings>=2.14.2",
     "scipy>=1.18.0",
+    "slowapi>=0.1.10",
+    "structlog>=26.1.0",
     "wh40kdc>=1.2.1",
 ]
 

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tabletop Tactician</title>
+
+  <!--
+    marked.js turns the markdown report we get back from the API into HTML.
+    It's loaded from a CDN, so it needs a network connection but no build step.
+    (ClerkJS is loaded later from JavaScript, because we need the publishable
+    key from the backend before we know which URL to load it from.)
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-top: 0; }
+
+    /* Top bar: the Clerk user button sits at the right when signed in. */
+    #auth-bar {
+      display: flex;
+      justify-content: flex-end;
+      min-height: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    form {
+      display: grid;
+      gap: 1rem;
+      padding: 1.5rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .field { display: grid; gap: 0.25rem; }
+    label { font-weight: 600; }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #1a1a2e;
+      color: white;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* The status line shows "generating…", errors, etc. */
+    #status {
+      margin: 1.5rem 0;
+      font-weight: 600;
+      min-height: 1.5rem;
+    }
+    #status.error { color: #b00020; }
+
+    /* Where the rendered markdown report lands. */
+    #report {
+      border-top: 1px solid #ddd;
+      padding-top: 1rem;
+    }
+    #report:empty { border: none; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <!-- Clerk mounts the user button (signed in) or nothing here. -->
+  <header id="auth-bar">
+    <div id="user-button"></div>
+  </header>
+
+  <h1>Tabletop Tactician</h1>
+  <p class="subtitle">Upload two army lists to get a matchup report.</p>
+
+  <!-- Shown while ClerkJS is still starting up. -->
+  <p id="auth-loading">Loading…</p>
+
+  <!-- Clerk mounts its sign-in widget here when the visitor is signed out. -->
+  <div id="sign-in" hidden></div>
+
+  <!-- The real app, revealed only once the visitor is signed in. -->
+  <form id="report-form" hidden>
+    <div class="field">
+      <label for="my-army">Your army list</label>
+      <input type="file" id="my-army" accept=".txt" required />
+    </div>
+
+    <div class="field">
+      <label for="enemy-army">Enemy army list</label>
+      <input type="file" id="enemy-army" accept=".txt" required />
+    </div>
+
+    <div class="field">
+      <!--
+        dry_run is checked by default so clicking around during development is
+        FREE (it skips the paid LLM call). Uncheck it to get a real analysis.
+      -->
+      <label>
+        <input type="checkbox" id="dry-run" checked />
+        Dry run (skip the paid analysis)
+      </label>
+    </div>
+
+    <button type="submit" id="submit-btn">Generate report</button>
+  </form>
+
+  <div id="status"></div>
+  <div id="report"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

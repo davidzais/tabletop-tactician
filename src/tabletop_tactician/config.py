@@ -10,9 +10,14 @@ class Settings(BaseSettings):
     )
 
     api_key: SecretStr
+    clerk_secret_key: SecretStr
+    clerk_publishable_key: str
+    clerk_jwks_url: str
     llm_model: str
     llm_base_url: str
     llm_provider: str
+    cors_origins: str = "http://localhost:8000"  # default if not set in .env
+    rate_limit: str = "5/day"  # default if not set in .env
 
 
 @cache
