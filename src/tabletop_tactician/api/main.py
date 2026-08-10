@@ -66,6 +66,7 @@ def verify_clerk_user(request: Request,  _credentials=Depends(bearer_scheme)) ->
     state = get_clerk().authenticate_request(request, options=AuthenticateRequestOptions(authorized_parties=_cors_origins))
     payload = state.payload
     if not state.is_signed_in or payload is None:
+        logger.error("unauthenticated_request", reason=state.reason, message=state.message, client=get_remote_address(request))
         raise HTTPException(401, "Not authenticated")
     return payload["sub"]   # the Clerk user id
 
@@ -152,7 +153,7 @@ def get_clerk() -> Clerk:
    return Clerk(bearer_auth=settings.clerk_secret_key.get_secret_value())
 
 def main() -> None:
-    uvicorn.run("tabletop_tactician.api.main:app", host="127.0.0.1", port=8000, reload=True, log_level="info")
+    uvicorn.run(app="tabletop_tactician.api.main:app", host="127.0.0.1", port=8000, reload=True, log_level="info")
 
 
 
