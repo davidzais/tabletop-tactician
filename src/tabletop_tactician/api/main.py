@@ -101,14 +101,6 @@ def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFil
 
         attacker: Army = load_roster(saved_files["my_army"])
         defender: Army = load_roster(saved_files["enemy_army"])
-
-        #creat a unique job id and set its status to pending in the JOBS dictionary
-        job_id = str(uuid4())
-        JOBS[job_id] = {"status": "pending", "report": None}
-
-        #run this in the background so that the API can return a response immediately
-        background_tasks.add_task(process_report, job_id, attacker, defender, dry_run)
-        return {"job_id": job_id}   
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not parse file {current_processing_army}: {str(e)}"
@@ -117,6 +109,15 @@ def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFil
         # Always close the FastAPI UploadFile stream
         my_army.file.close()
         enemy_army.file.close()
+    #create a unique job id and set its status to pending in the JOBS dictionary
+    job_id = str(uuid4())
+    JOBS[job_id] = {"status": "pending", "report": None}
+
+    #run this in the background so that the API can return a response immediately
+    background_tasks.add_task(process_report, job_id, attacker, defender, dry_run)
+    return {"job_id": job_id}   
+    
+ 
 
     
 
@@ -138,7 +139,8 @@ def process_report(job_id: str, my_army: Army, enemy_army: Army, dry_run: bool =
     try:
         report = build_full_report(my_army=my_army, enemy_army=enemy_army, dry_run=dry_run)
         JOBS[job_id] = {"status": "done", "report": report}
-    except ValueError as e:
+    except Exception as e:
+        logger.error("report_generation_failed", job_id=job_id, error=str(e))
         JOBS[job_id] = {"status": "failed", "error": str(e)}
 
 
