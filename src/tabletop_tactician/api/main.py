@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import structlog
+from tabletop_tactician.models.reports import UserModel
 import uvicorn
 from clerk_backend_api import Clerk
 from clerk_backend_api.security.types import AuthenticateRequestOptions
@@ -88,7 +89,9 @@ def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFil
 
     saved_files = {}
     current_processing_army = None
-    db_service.ensure_user_exists(user_id=user_id)  # ensure the user exists in the database
+    user: UserModel = db_service.get_or_create_user(user_id=user_id)  # ensure the user exists in the database
+    if not user.enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not enabled to run reports")
     
     try:
         current_processing_army = "my_army"
@@ -136,12 +139,12 @@ def get_config() -> dict[str, str]:
         "clerk_publishable_key": settings.clerk_publishable_key
     }
 
-def process_report(job_id: str, my_army: Army, enemy_army: Army, user_id: str,  dry_run: bool = False, ) -> None:
+def process_report(job_id: str, my_army: Army, enemy_army: Army, user_id: str, dry_run: bool = False, ) -> None:
     try:
-        report = build_full_report(my_army=my_army, enemy_army=enemy_army, dry_run=dry_run)        
+        report = build_full_report(my_army=my_army, enemy_army=enemy_army, dry_run=dry_run)             
         db_service.mark_report_done(job_id=job_id, user_id=user_id, result=report)  # store the report in the database       
     except Exception as e:
-        logger.error("report_generation_failed", job_id=job_id, error=str(e))
+        logger.error("report_generation_failed", job_id=job_id, error=str(e))  
         db_service.mark_report_failed(job_id=job_id, error_msg=str(e))
 
 
