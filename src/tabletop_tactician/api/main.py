@@ -23,6 +23,8 @@ from tabletop_tactician.config import get_settings
 from tabletop_tactician.logging_config import configure_logging
 from tabletop_tactician.reference_data.roster import Army, load_roster
 
+from tabletop_tactician.persistence import db_service
+
 configure_logging(
     log_level=os.getenv("LOG_LEVEL", "INFO"),
     json_logs=os.getenv("JSON_LOGS", "false").lower() == "true",
@@ -56,7 +58,6 @@ app.add_middleware(
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-JOBS: dict[str, dict[str, str | None]] = {}
 
 def _get_rate_limit() -> str:
     settings = get_settings()
@@ -64,7 +65,7 @@ def _get_rate_limit() -> str:
 
 def verify_clerk_user(request: Request,  _credentials=Depends(bearer_scheme)) -> str:
     state = get_clerk().authenticate_request(request, options=AuthenticateRequestOptions(authorized_parties=_cors_origins))
-    payload = state.payload
+    payload = state.payload  
     if not state.is_signed_in or payload is None:
         logger.error("unauthenticated_request", reason=state.reason, message=state.message, client=get_remote_address(request))
         raise HTTPException(401, "Not authenticated")
@@ -81,12 +82,13 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
-@app.post("/report", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(verify_clerk_user)])
+@app.post("/report", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(limit_value=_get_rate_limit)
-def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFile, background_tasks: BackgroundTasks, dry_run: bool = False):
+def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFile, background_tasks: BackgroundTasks, dry_run: bool = False, user_id: str = Depends(verify_clerk_user)):
 
     saved_files = {}
     current_processing_army = None
+    db_service.ensure_user_exists(user_id=user_id)  # ensure the user exists in the database
     
     try:
         current_processing_army = "my_army"
@@ -111,10 +113,9 @@ def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFil
         enemy_army.file.close()
     #create a unique job id and set its status to pending in the JOBS dictionary
     job_id = str(uuid4())
-    JOBS[job_id] = {"status": "pending", "report": None}
-
+    db_service.create_pending_report(job_id=job_id, user_id=user_id, attacking_army=saved_files["my_army"], defending_army=saved_files["enemy_army"])  # store the uploaded files in the database
     #run this in the background so that the API can return a response immediately
-    background_tasks.add_task(process_report, job_id, attacker, defender, dry_run)
+    background_tasks.add_task(process_report, job_id, attacker, defender, user_id, dry_run)
     return {"job_id": job_id}   
     
  
@@ -123,10 +124,10 @@ def generate_report(request: Request, my_army: UploadFile, enemy_army: UploadFil
 
 @app.get("/report/{job_id}", dependencies=[Depends(verify_clerk_user)])
 def get_report(job_id: str):
-    job = JOBS.get(job_id)
+    job = db_service.get_report(job_id=job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="unknown job id")
-    return job   # {"status": "pending"}  or  {"status": "done", "report": "..."}
+    return job   
    
 @app.get("/config")  
 def get_config() -> dict[str, str]:
@@ -135,13 +136,13 @@ def get_config() -> dict[str, str]:
         "clerk_publishable_key": settings.clerk_publishable_key
     }
 
-def process_report(job_id: str, my_army: Army, enemy_army: Army, dry_run: bool = False) -> None:
+def process_report(job_id: str, my_army: Army, enemy_army: Army, user_id: str,  dry_run: bool = False, ) -> None:
     try:
-        report = build_full_report(my_army=my_army, enemy_army=enemy_army, dry_run=dry_run)
-        JOBS[job_id] = {"status": "done", "report": report}
+        report = build_full_report(my_army=my_army, enemy_army=enemy_army, dry_run=dry_run)        
+        db_service.mark_report_done(job_id=job_id, user_id=user_id, result=report)  # store the report in the database       
     except Exception as e:
         logger.error("report_generation_failed", job_id=job_id, error=str(e))
-        JOBS[job_id] = {"status": "failed", "error": str(e)}
+        db_service.mark_report_failed(job_id=job_id, error_msg=str(e))
 
 
 

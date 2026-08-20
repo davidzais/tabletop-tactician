@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     api_key: SecretStr
     clerk_secret_key: SecretStr
+    database_url: SecretStr
     clerk_publishable_key: str
     clerk_jwks_url: str
     llm_model: str

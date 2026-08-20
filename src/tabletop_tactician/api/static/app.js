@@ -26,6 +26,7 @@ const userButtonEl = document.getElementById("user-button");
 
 // How often to re-check the job, in milliseconds.
 const POLL_INTERVAL_MS = 2000;
+const MAX_POLL_COUNT = 60;
 
 // A tiny helper to pause for a while inside an async function.
 // (There's no built-in "sleep" in JavaScript, so we wrap setTimeout in a Promise.)
@@ -141,21 +142,27 @@ async function submitReport(myArmyFile, enemyArmyFile, dryRun) {
 
 // STEP 2 — keep asking the server until the job is finished.
 async function pollUntilFinished(jobId) {
+  var poll_count = 0;
   while (true) {
     const response = await fetch(`/report/${jobId}`, {
       headers: await authHeaders(),
     });
     const job = await response.json();
+    
 
-    if (job.status === "done") {
-      return job.report;
+    if (job.status === "DONE") {
+      return job.result;
     }
-    if (job.status === "failed") {
-      throw new Error(job.error ?? "The report failed to generate.");
+    if (job.status === "ERROR") {
+      throw new Error(job.error_msg ?? "The report failed to generate.");
     }
 
     // Still "pending" — wait, then loop around and ask again.
     await sleep(POLL_INTERVAL_MS);
+    poll_count++;
+    if (poll_count >= MAX_POLL_COUNT) {
+      throw new Error("Report generation timed out.");
+    }
   }
 }
 
