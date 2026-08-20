@@ -69,6 +69,17 @@
     #report:empty { border: none; }
 
     [hidden] { display: none !important; }
+
+    /* When printing, show ONLY the report — hide all the app chrome so the
+       printout (and "Save as PDF") is a clean document, not a screenshot. */
+    @media print {
+      #auth-bar, h1, .subtitle, #auth-loading, #sign-in,
+      #report-form, #status, #print-btn { display: none !important; }
+      body { margin: 0; max-width: none; }
+      #report { border: none; padding: 0; }
+      /* Don't strand a heading at the bottom of a page. */
+      #report h1, #report h2, #report h3 { break-after: avoid; }
+    }
   </style>
 </head>
 <body>
@@ -98,21 +109,12 @@
       <input type="file" id="enemy-army" accept=".txt" required />
     </div>
 
-    <div class="field">
-      <!--
-        dry_run is checked by default so clicking around during development is
-        FREE (it skips the paid LLM call). Uncheck it to get a real analysis.
-      -->
-      <label>
-        <input type="checkbox" id="dry-run" checked />
-        Dry run (skip the paid analysis)
-      </label>
-    </div>
-
     <button type="submit" id="submit-btn">Generate report</button>
   </form>
 
   <div id="status"></div>
+  <!-- Revealed by app.js once a report has rendered; triggers the browser print dialog. -->
+  <button type="button" id="print-btn" hidden>Print report</button>
   <div id="report"></div>
 
   <script src="/static/app.js"></script>
