@@ -16,10 +16,10 @@
 const form = document.getElementById("report-form");
 const myArmyInput = document.getElementById("my-army");
 const enemyArmyInput = document.getElementById("enemy-army");
-const dryRunInput = document.getElementById("dry-run");
 const submitButton = document.getElementById("submit-btn");
 const statusEl = document.getElementById("status");
 const reportEl = document.getElementById("report");
+const printButton = document.getElementById("print-btn");
 const authLoadingEl = document.getElementById("auth-loading");
 const signInEl = document.getElementById("sign-in");
 const userButtonEl = document.getElementById("user-button");
@@ -116,14 +116,14 @@ async function initAuth() {
 // ---------------------------------------------------------------------------
 
 // STEP 1 — send the two files, get a job_id back.
-async function submitReport(myArmyFile, enemyArmyFile, dryRun) {
+async function submitReport(myArmyFile, enemyArmyFile) {
   // FormData is how the browser builds a multipart/form-data upload. The field
   // names ("my_army", "enemy_army") must match what the endpoint expects.
   const formData = new FormData();
   formData.append("my_army", myArmyFile);
   formData.append("enemy_army", enemyArmyFile);
 
-  const response = await fetch(`/report?dry_run=${dryRun}`, {
+  const response = await fetch("/report", {
     method: "POST",
     body: formData,
     headers: await authHeaders(),
@@ -169,6 +169,7 @@ async function pollUntilFinished(jobId) {
 // STEP 3 — render the markdown report as HTML.
 function renderReport(markdown) {
   reportEl.innerHTML = marked.parse(markdown);
+  printButton.hidden = false; // reveal "Print report" now that there's something to print
 }
 
 // Wire the whole flow to the form's submit.
@@ -178,12 +179,11 @@ form.addEventListener("submit", async (event) => {
   // Lock the button and clear any previous run.
   submitButton.disabled = true;
   reportEl.innerHTML = "";
+  printButton.hidden = true;
 
   try {
-    const dryRun = dryRunInput.checked;
-
     showStatus("Submitting…");
-    const jobId = await submitReport(myArmyInput.files[0], enemyArmyInput.files[0], dryRun);
+    const jobId = await submitReport(myArmyInput.files[0], enemyArmyInput.files[0]);
 
     showStatus("Generating report… this can take a bit.");
     const report = await pollUntilFinished(jobId);
@@ -196,6 +196,11 @@ form.addEventListener("submit", async (event) => {
     submitButton.disabled = false;
   }
 });
+
+// The print button just opens the browser's print dialog; the @media print
+// rules in index.html strip the page down to the report itself. (The dialog's
+// "Save as PDF" option means this doubles as a PDF export.)
+printButton.addEventListener("click", () => window.print());
 
 // Kick everything off: get auth ready before the user can do anything.
 initAuth().catch((error) => {
