@@ -97,11 +97,11 @@ def test_matchup(army_a: Army, army_b: Army):
 
 
 def test_wound_pool():
-    # two profiles + composition → itemize: 9×1 + 1×2 = 11
+    # two profiles + composition → itemize: 9×1 + 1×3 = 12
     # produces the following 2 profiles
     # .[{'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 1, 'invuln_sv': None, 'name': 'Boy'},
-    #  {'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 2, 'invuln_sv': None, 'name': 'Boss Nob'}]
-    # so a unit of 9 boyz and 1 Nob 9×1 + 1×2 = 11 wounds
+    #  {'Ld': 7, 'M': 6, 'OC': 2, 'Sv': 5, 'T': 5, 'W': 3, 'invuln_sv': None, 'name': 'Boss Nob'}]
+    # so a unit of 9 boyz and 1 Nob 9×1 + 1×3 = 12 wounds
     boyz = FieldedUnit(
         id="boyz",
         name="Boyz",
@@ -109,11 +109,11 @@ def test_wound_pool():
         wargear=[],
         composition=[UnitComposition("Boss Nob", 1), UnitComposition("Boy", 9)],
     )
-    assert wound_pool(boyz) == 11
+    assert wound_pool(boyz) == 12
 
-    # one profile → model_count × W, composition irrelevant: 5×2 = 10
+    # one profile → model_count × W, composition irrelevant: 5×3 = 15
     nobz = FieldedUnit(id="nobz", name="Nobz", model_count=5, wargear=[], composition=[])
-    assert wound_pool(nobz) == 10
+    assert wound_pool(nobz) == 15
 
     # two profiles, no composition → model_count × min(W): 11 × min(1,2) = 11
     gretchin = FieldedUnit(id="gretchin", name="Gretchin", model_count=11, wargear=[], composition=[])

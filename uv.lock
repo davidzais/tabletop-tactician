@@ -1241,7 +1241,7 @@ requires-dist = [
     { name = "slowapi", specifier = ">=0.1.10" },
     { name = "sqlalchemy", specifier = ">=2.0.52" },
     { name = "structlog", specifier = ">=26.1.0" },
-    { name = "wh40kdc", specifier = ">=1.2.1" },
+    { name = "wh40kdc", specifier = ">=1.2.6" },
 ]
 
 [package.metadata.requires-dev]
@@ -1457,14 +1457,14 @@ wheels = [
 
 [[package]]
 name = "wh40kdc"
-version = "1.2.1"
+version = "1.2.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonschema" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/26/e18337b63c0046cc92b7d91601b90a729cc33ce38febd2086ce219cdf12d/wh40kdc-1.2.1.tar.gz", hash = "sha256:55583eefe722475d87da5e94709e2fa3d25ae679b365d4adacce3718d4a5d9ca", size = 1007898, upload-time = "2026-07-29T18:57:31.609Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/12/f3fea8e2226f6546726c5e9ac260c5ef03b51dcc7b7d537aee503ae8ed23/wh40kdc-1.2.6.tar.gz", hash = "sha256:a362c2c47c84270da972e4027dbaf3ec4794e5454055bae4f871108696c9fdfc", size = 1064249, upload-time = "2026-08-21T18:35:01.467Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/df/fa88a898d2ad7afb94cb20abbac2ad4b109010e8a401efd4f9e90b66c6f3/wh40kdc-1.2.1-py3-none-any.whl", hash = "sha256:543cfd5b0db2b7c475aaee57b99dc039d230079a6d6b1a4906456a7763ed2ce5", size = 1084749, upload-time = "2026-07-29T18:57:30.051Z" },
+    { url = "https://files.pythonhosted.org/packages/02/24/854f79d6a7994ac17cda3cdc51d36d666fce72ed464c0bb162497ddfacf8/wh40kdc-1.2.6-py3-none-any.whl", hash = "sha256:1aa2840646a656c6154be1a1fa71de33b0492f964f90ee252ca238787ed4c357", size = 1139988, upload-time = "2026-08-21T18:34:59.828Z" },
 ]
 
 [[package]]
